@@ -7,3 +7,6 @@ Thumbs.db
 *.cfg
 tags
 cscope.*
+.projectVim
+.vimSession
+ctag.files

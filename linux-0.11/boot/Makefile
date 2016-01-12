@@ -21,4 +21,4 @@ head.o: head.s
 	@$(AS) -o head.o head.s
 
 clean:
-	@rm -f bootsect bootsect.o setup setup.o head.o
+	@rm -f bootsect bootsect.o setup setup.o head.o bootsect.sym setup.sym

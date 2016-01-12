@@ -5,6 +5,7 @@
  */
 
 #define __LIBRARY__
+#define __IN_MAIN__
 #include <unistd.h>
 #include <time.h>
 
@@ -20,8 +21,8 @@
  * won't be any messing with the stack from main(), but we define
  * some others too.
  */
-static inline fork(void) __attribute__((always_inline));
-static inline pause(void) __attribute__((always_inline));
+static inline int fork(void) __attribute__((always_inline));
+static inline int pause(void) __attribute__((always_inline));
 static inline _syscall0(int,fork)
 static inline _syscall0(int,pause)
 static inline _syscall1(int,setup,void *,BIOS)
@@ -103,7 +104,7 @@ static long main_memory_start = 0;
 
 struct drive_info { char dummy[32]; } drive_info;
 
-void main(void)		/* This really IS void, no error here. */
+void start_kernel(void)	/* This really IS void, no error here. */
 {			/* The startup routine assumes (well, ...) this */
 /*
  * Interrupts are still disabled. Do necessary setups, then

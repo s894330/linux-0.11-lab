@@ -28,6 +28,17 @@ ifeq ($(OS), Linux)
 	LD	= ld
 	LDFLAGS = -m elf_i386
 	CC	= gcc
+	# -g: Produce debugging information. GDB can work with this debugging
+	#     	information.
+	# -fno-stack-protector: Ubuntu's GCC by default enables the
+	# 	-fstack-protector flag, which defends against stack overflow
+	# 	attacks, so we need to turn off it
+	# -fomit-frame-pointer: Don’t keep the frame pointer in a register for
+	# 	functions that don’t need one. Starting with GCC version 4.6,
+	# 	the default setting (when not optimizing for size) for 32-bit
+	# 	GNU/Linux x86 targets has been changed to ‘-fomit-frame-pointer’
+	# -fstrength-reduce: Perform the optimizations of loop strength
+	# 	reduction and elimination of iteration variables. 	
 	CFLAGS  = -g -m32 -fno-builtin -fno-stack-protector \
 		  -fomit-frame-pointer -fstrength-reduce -Wall
 	CPP	= cpp -nostdinc
@@ -41,8 +52,8 @@ ifeq ($(OS), Darwin)
 	LD	= i386-elf-ld
 	LDFLAGS = -m elf_i386
 	CC	= i386-elf-gcc
-	CFLAGS  = -gdwarf-2 -g3 -m32 -fno-builtin -fno-stack-protector -fomit-frame-pointer -fstrength-reduce #-Wall
-
+	CFLAGS  = -gdwarf-2 -g3 -m32 -fno-builtin -fno-stack-protector \
+		  -fomit-frame-pointer -fstrength-reduce #-Wall
 	CPP	= i386-elf-cpp -nostdinc
 	AR	=i386-elf-ar
 	STRIP = i386-elf-strip

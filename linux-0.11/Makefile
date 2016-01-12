@@ -27,11 +27,11 @@ LIBS	=lib/lib.a
 .c.s:
 	@$(CC) $(CFLAGS) -S -o $*.s $<
 .s.o:
-	@$(AS)  -o $*.o $<
+	@$(AS) -o $*.o $<
 .c.o:
 	@$(CC) $(CFLAGS) -c -o $*.o $<
 
-all:	Image
+all: Image
 
 Image: boot/bootsect boot/setup kernel.sym ramfs FORCE
 	@cp -f images/kernel.sym images/kernel.tmp
@@ -48,14 +48,10 @@ init/main.o: FORCE
 boot/head.o: boot/head.s FORCE
 	@make head.o -C boot/
 
-kernel.sym: boot/head.o init/main.o \
-		$(ARCHIVES) $(DRIVERS) $(MATH) $(LIBS)
+kernel.sym: boot/head.o init/main.o $(ARCHIVES) $(DRIVERS) $(MATH) $(LIBS)
 	@$(LD) $(LDFLAGS) boot/head.o init/main.o \
-	$(ARCHIVES) \
-	$(DRIVERS) \
-	$(MATH) \
-	$(LIBS) \
-	-o images/kernel.sym
+		$(ARCHIVES) $(DRIVERS) $(MATH) $(LIBS) \
+		-o images/kernel.sym
 	@nm images/kernel.sym | grep -v '\(compiled\)\|\(\.o$$\)\|\( [aU] \)\|\(\.\.ng$$\)\|\(LASH[RL]DI\)'| sort > images/kernel.map
 
 kernel/math/math.a: FORCE

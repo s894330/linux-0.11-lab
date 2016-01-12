@@ -4,6 +4,10 @@ LDFLAGS	+= -Ttext 0
 
 all: bootsect setup
 
+# cp -f: force copy
+# objcopy -R: remove specific section
+#	  -S: strip all
+#	  -O: output target
 bootsect: bootsect.s
 	@$(AS) -o bootsect.o bootsect.s
 	@$(LD) $(LDFLAGS) -o bootsect bootsect.o

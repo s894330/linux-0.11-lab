@@ -8,7 +8,7 @@
 # b: callgraph picture displayer
 
 ifeq ($(f),)
-        f = main
+        f = start_kernel
 endif
 ifeq ($(d),)
         d = ./

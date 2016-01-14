@@ -62,7 +62,7 @@ _start:
 	sub	%si, %si	    # source addr ds:si = 0x07c0:0x0000 = 0x7c00
 	sub	%di, %di	    # dest addr es:di = 0x9000:0x0000 = 0x90000
 	rep			# repeat 256 count, 2byte/count, total = 512byte
-	movsw
+		movsw
 	ljmp	$INITSEG, $go	    # cs = 0x9000
 go:	mov	%cs, %ax	    # ds = es = ss = cs = 0x9000
 	mov	%ax, %ds
@@ -105,8 +105,8 @@ ok_load_setup:
 	mov	%ax, %es	# to get drive param, so set it back to 0x9000
 
 	# Print some inane message
-	mov	$0x03, %ah		# service 3: read cursor pos, stored at:
-	xor	%bh, %bh		# dh: row, dl: column
+	mov	$0x03, %ah		# service 3: read page 0 (bh) cursor pos
+	xor	%bh, %bh		# stroed at dh: row, dl: column
 	int	$0x10
 	
 	mov	$20, %cx		# write string, totally 20 byte
@@ -161,7 +161,7 @@ root_defined:
 # the setup-routine loaded directly after
 # the bootblock:
 
-	ljmp	$SETUPSEG, $0		# cs = 0x0920
+	ljmp	$SETUPSEG, $0		# cs = 0x9020
 
 # This routine loads the system at address 0x10000, making sure
 # no 64kB boundaries are crossed. We try to load it as fast as

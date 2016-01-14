@@ -13,6 +13,9 @@ extern desc_table idt,gdt;
 #define GDT_DATA 2
 #define GDT_TMP 3
 
+#define KERNEL_CODE_SEG 0x08
+#define KERNEL_DATA_SEG 0x10
+
 #define LDT_NUL 0
 #define LDT_CODE 1
 #define LDT_DATA 2

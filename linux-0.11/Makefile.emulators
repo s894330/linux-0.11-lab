@@ -32,6 +32,7 @@ BOCHS_CFG = tools/bochs/bochsrc/
 BOCHS_CMD = $(BOCHS) -f $(BOCHS_CFG)/bochsrc-fda.bxrc
 BOCHS_CMD_FDB = $(BOCHS) -f $(BOCHS_CFG)/bochsrc-fdb.bxrc
 BOCHS_CMD_HDA = $(BOCHS) -f $(BOCHS_CFG)/bochsrc-hd.bxrc
+BOCHS_CMD_HDA_DBG_GUI = $(BOCHS_DBG_GUI) -f $(BOCHS_CFG)/bochsrc-hd.bxrc.gui
 BOCHS_DBG = .dbg
 
 VM = $(shell cat $(VM_CFG))
@@ -91,3 +92,8 @@ debug-fd: Image flp
 debug-hd: Image hda
 	$(SETROOTDEV_CMD_HDA)
 	$(VM_CMD_HDA)$(VM_DBG)
+
+debugss: Image hda
+	$(SETROOTDEV_CMD_HDA)
+	$(BOCHS_CMD_HDA_DBG_GUI)	
+

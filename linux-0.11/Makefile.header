@@ -5,6 +5,7 @@ QEMU = qemu-system-i386
 
 # Bochs
 BOCHS = bochs
+BOCHS_DBG_GUI = bochs-dbg
 
 # VM configuration
 VM_CFG = tools/vm.cfg

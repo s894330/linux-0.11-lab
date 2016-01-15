@@ -60,7 +60,7 @@ extern long startup_time;
  */
 #define EXT_MEM_K (*(unsigned short *)0x90002)
 #define DRIVE_INFO (*(struct drive_info *)0x90080)
-#define ORIG_ROOT_DEV (*(unsigned short *)0x901FC)
+#define ORIG_ROOT_DEV (*(unsigned short *)0x901fc)
 
 /*
  * Yeah, yeah, it's ugly, but I cannot find how to do this correctly
@@ -68,33 +68,44 @@ extern long startup_time;
  * clock I'd be interested. Most of this was trial and error, and some
  * bios-listing reading. Urghh.
  */
-
 #define CMOS_READ(addr) ({ \
-outb_p(0x80|addr,0x70); \
-inb_p(0x71); \
+	outb_p(0x80 | addr, 0x70); \
+	inb_p(0x71); \
 })
 
-#define BCD_TO_BIN(val) ((val)=((val)&15) + ((val)>>4)*10)
+/* data stored in CMOS is BCD codec 
+ * using 1byte: high 4bit value a = a*10
+ *		low 4bit value b = b
+ * for example:
+ *	14 = 0001 0100
+ *	27 = 0010 0111
+ * 
+ * so we need transfer it
+ */
+#define BCD_TO_BIN(val) ((val) = ((val) & 15) + ((val) >> 4) * 10)
 
 static void time_init(void)
 {
 	struct tm time;
 
-	do {
-		time.tm_sec = CMOS_READ(0);
-		time.tm_min = CMOS_READ(2);
-		time.tm_hour = CMOS_READ(4);
-		time.tm_mday = CMOS_READ(7);
-		time.tm_mon = CMOS_READ(8);
-		time.tm_year = CMOS_READ(9);
+	do {					/* Register  Contents */
+		time.tm_sec = CMOS_READ(0);	/* 0x00      Seconds */
+		time.tm_min = CMOS_READ(2);	/* 0x02      Minutes */
+		time.tm_hour = CMOS_READ(4);	/* 0x04      Hours */
+		time.tm_mday = CMOS_READ(7);	/* 0x07      Day of Month */
+		time.tm_mon = CMOS_READ(8);	/* 0x08      Month */
+		time.tm_year = CMOS_READ(9);	/* 0x09      Year */
 	} while (time.tm_sec != CMOS_READ(0));
+
 	BCD_TO_BIN(time.tm_sec);
 	BCD_TO_BIN(time.tm_min);
 	BCD_TO_BIN(time.tm_hour);
 	BCD_TO_BIN(time.tm_mday);
 	BCD_TO_BIN(time.tm_mon);
 	BCD_TO_BIN(time.tm_year);
+
 	time.tm_mon--;
+	/* startup_time = total passed seconds since from 1970/1/1 0:00:00 */
 	startup_time = kernel_mktime(&time);
 }
 
@@ -102,7 +113,9 @@ static long memory_end = 0;
 static long buffer_memory_end = 0;
 static long main_memory_start = 0;
 
-struct drive_info { char dummy[32]; } drive_info;
+struct drive_info {
+	char dummy[32];
+} drive_info;
 
 void start_kernel(void)	/* This really IS void, no error here. */
 {			/* The startup routine assumes (well, ...) this */
@@ -110,22 +123,25 @@ void start_kernel(void)	/* This really IS void, no error here. */
  * Interrupts are still disabled. Do necessary setups, then
  * enable them
  */
-
  	ROOT_DEV = ORIG_ROOT_DEV;
  	drive_info = DRIVE_INFO;
-	memory_end = (1<<20) + (EXT_MEM_K<<10);
-	memory_end &= 0xfffff000;
-	if (memory_end > 16*1024*1024)
-		memory_end = 16*1024*1024;
-	if (memory_end > 12*1024*1024) 
-		buffer_memory_end = 4*1024*1024;
-	else if (memory_end > 6*1024*1024)
-		buffer_memory_end = 2*1024*1024;
+	memory_end = (1 << 20) + (EXT_MEM_K << 10); /* 1MB + 1KB * EXT_MEM_K */
+	memory_end &= 0xfffff000;   /* ignore the last memory with align 4KB */
+
+	/* if physical mem > 16MB, set it to 16MB */
+	if (memory_end > 16 * 1024 * 1024)
+		memory_end = 16 * 1024 * 1024;
+
+	if (memory_end > 12 * 1024 * 1024) 
+		buffer_memory_end = 4 * 1024 * 1024;
+	else if (memory_end > 6 * 1024 * 1024)
+		buffer_memory_end = 2 * 1024 * 1024;
 	else
-		buffer_memory_end = 1*1024*1024;
+		buffer_memory_end = 1 * 1024 * 1024;
+
 	main_memory_start = buffer_memory_end;
 #ifdef RAMDISK
-	main_memory_start += rd_init(main_memory_start, RAMDISK*1024);
+	main_memory_start += rd_init(main_memory_start, RAMDISK * 1024);
 #endif
 	mem_init(main_memory_start,memory_end);
 	trap_init();

@@ -49,45 +49,52 @@
 #define O_LCUC(tty)	_O_FLAG((tty),OLCUC)
 
 struct tty_struct tty_table[] = {
-	{
-		{ICRNL,		/* change incoming CR to NL */
-		OPOST|ONLCR,	/* change outgoing NL to CRNL */
-		0,
-		ISIG | ICANON | ECHO | ECHOCTL | ECHOKE,
-		0,		/* console termio */
-		INIT_C_CC},
-		0,			/* initial pgrp */
-		0,			/* initial stopped */
-		con_write,
-		{0,0,0,0,""},		/* console read-queue */
-		{0,0,0,0,""},		/* console write-queue */
-		{0,0,0,0,""}		/* console secondary queue */
-	},{
-		{0, /* no translation */
-		0,  /* no translation */
-		B2400 | CS8,
-		0,
-		0,
-		INIT_C_CC},
-		0,
-		0,
-		rs_write,
-		{0x3f8,0,0,0,""},		/* rs 1 */
-		{0x3f8,0,0,0,""},
-		{0,0,0,0,""}
-	},{
-		{0, /* no translation */
-		0,  /* no translation */
-		B2400 | CS8,
-		0,
-		0,
-		INIT_C_CC},
-		0,
-		0,
-		rs_write,
-		{0x2f8,0,0,0,""},		/* rs 2 */
-		{0x2f8,0,0,0,""},
-		{0,0,0,0,""}
+	{	/* console */
+		.termios = {
+			.c_iflag = ICRNL,	  /* change incoming CR to NL */
+			.c_oflag = OPOST | ONLCR, /* change outgoing NL to CR */
+			.c_cflag = 0,
+			.c_lflag = ISIG | ICANON | ECHO | ECHOCTL | ECHOKE,
+			.c_line = 0,		/* console termio */
+			.c_cc = INIT_C_CC
+		},
+		.pgrp = 0,			/* initial pgrp */
+		.stopped = 0,			/* initial stopped */
+		.write = con_write,
+		    /* {data, head, tail, proc_list, buf[]}  */
+		.read_q = {0, 0, 0, 0, ""},	/* console read-queue */
+		.write_q = {0, 0, 0, 0, ""},    /* console write-queue */
+		.secondary = {0, 0, 0, 0, ""}   /* console secondary queue */
+	},{	/* serial 1 */
+		.termios =  {
+			.c_iflag = 0,		/* no translation */
+			.c_oflag = 0,		/* no translation */
+			.c_cflag = B2400 | CS8,
+			.c_lflag = 0,
+			.c_line = 0,
+			.c_cc = INIT_C_CC
+		},
+		.pgrp = 0,
+		.stopped = 0,
+		.write = rs_write,
+		.read_q = {0x3f8, 0, 0, 0, ""},	/* rs 1 (COM1, IRQ4) */
+		.write_q = {0x3f8, 0, 0, 0, ""},
+		.secondary = {0, 0, 0, 0, ""}
+	},{	/* serial 2 */
+		.termios =  {
+			.c_iflag = 0,		/* no translation */
+			.c_oflag = 0,		/* no translation */
+			.c_cflag = B2400 | CS8,
+			.c_lflag = 0,
+			.c_line = 0,
+			.c_cc = INIT_C_CC
+		},
+		.pgrp = 0,
+		.stopped = 0,
+		.write = rs_write,
+		.read_q = {0x2f8, 0, 0, 0, ""},	/* rs 2 (COM2, IRQ3) */
+		.write_q = {0x2f8, 0, 0, 0, ""},
+		.secondary = {0, 0, 0, 0, ""}
 	}
 };
 

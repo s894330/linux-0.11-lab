@@ -246,7 +246,7 @@ setup_paging:
 
 	xorl 	%eax, %eax		/* pg_dir is at 0x0000 */
 	movl 	%eax, %cr3		/* load addr of pg_dir into cr3 */
-
+					/* movl to cr3 will refresh TLB */
 	movl 	%cr0, %eax		/* set paging (PG) bit */
 	orl 	$0x80000000, %eax	/* this also flushes prefetch-queue */
 	movl 	%eax, %cr0

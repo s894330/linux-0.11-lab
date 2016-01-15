@@ -26,10 +26,10 @@ struct request {
 	int errors;
 	unsigned long sector;
 	unsigned long nr_sectors;
-	char * buffer;
-	struct task_struct * waiting;
-	struct buffer_head * bh;
-	struct request * next;
+	char *buffer;
+	struct task_struct *waiting;
+	struct buffer_head *bh;
+	struct request *next;
 };
 
 /*

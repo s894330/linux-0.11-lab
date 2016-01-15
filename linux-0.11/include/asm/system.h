@@ -16,28 +16,31 @@ __asm__ ("movl %%esp,%%eax\n\t" \
 #define sti() __asm__ ("sti"::)
 #define cli() __asm__ ("cli"::)
 #define nop() __asm__ ("nop"::)
+#define hang() __asm__ ("loop:	jmp loop"::)
 
 #define iret() __asm__ ("iret"::)
 
-#define _set_gate(gate_addr,type,dpl,addr) \
+/*
+ * setup IDT gate entry
+ *
+ * format:
+ * 31 ........... 16 15 14 13 12 11 ... 8 7 6 5 4 ... 0
+ * ISR addr of 31~16 P   DPL  0    type   0 0 0
+ *   seg. selector   ISR addr of 15~0
+ */
+#define _set_gate(gate_addr, type, dpl, addr) \
 __asm__ ("movw %%dx,%%ax\n\t" \
 	"movw %0,%%dx\n\t" \
 	"movl %%eax,%1\n\t" \
 	"movl %%edx,%2" \
-	: \
-	: "i" ((short) (0x8000+(dpl<<13)+(type<<8))), \
-	"o" (*((char *) (gate_addr))), \
-	"o" (*(4+(char *) (gate_addr))), \
-	"d" ((char *) (addr)),"a" (0x00080000))
+	:: "i" ((short)(0x8000 + (dpl << 13)+(type << 8))), \
+	"o" (*((char *)(gate_addr))), \
+	"o" (*(4 + (char *)(gate_addr))), \
+	"d" ((char *)(addr)), "a" (0x00080000))
 
-#define set_intr_gate(n,addr) \
-	_set_gate(&idt[n],14,0,addr)
-
-#define set_trap_gate(n,addr) \
-	_set_gate(&idt[n],15,0,addr)
-
-#define set_system_gate(n,addr) \
-	_set_gate(&idt[n],15,3,addr)
+#define set_intr_gate(n, addr) _set_gate(&idt[n], 14, 0, addr)
+#define set_trap_gate(n, addr) _set_gate(&idt[n], 15, 0, addr)
+#define set_system_gate(n,addr) _set_gate(&idt[n], 15, 3, addr)
 
 #define _set_seg_desc(gate_addr,type,dpl,base,limit) {\
 	*(gate_addr) = ((base) & 0xff000000) | \

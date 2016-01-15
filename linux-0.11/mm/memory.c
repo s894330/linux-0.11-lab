@@ -397,18 +397,26 @@ void do_no_page(unsigned long error_code,unsigned long address)
 	oom();
 }
 
+/* 
+ * initial mem_map[] array
+ * mem_map[i] correspond one 4KB physical page, 0 means unused
+ * > 0 means used
+ */
 void mem_init(long start_mem, long end_mem)
 {
 	int i;
 
 	HIGH_MEMORY = end_mem;
-	for (i=0 ; i<PAGING_PAGES ; i++)
+
+	for (i = 0; i < PAGING_PAGES; i++)
 		mem_map[i] = USED;
+
 	i = MAP_NR(start_mem);
 	end_mem -= start_mem;
 	end_mem >>= 12;
+
 	while (end_mem-->0)
-		mem_map[i++]=0;
+		mem_map[i++] = 0;
 }
 
 void calc_mem(void)

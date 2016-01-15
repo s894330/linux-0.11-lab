@@ -57,7 +57,7 @@ extern void keyboard_interrupt(void);
 
 static unsigned char	video_type;		/* Type of display being used	*/
 static unsigned long	video_num_columns;	/* Number of text columns	*/
-static unsigned long	video_size_row;		/* Bytes per row		*/
+static unsigned long	video_size_per_row;		/* Bytes per row		*/
 static unsigned long	video_num_lines;	/* Number of test lines		*/
 static unsigned char	video_page;		/* Initial video page		*/
 static unsigned long	video_mem_start;	/* Start of video RAM		*/
@@ -85,13 +85,14 @@ static void sysbeep(void);
 #define RESPONSE "\033[?1;2c"
 
 /* NOTE! gotoxy thinks x==video_num_columns is ok */
-static inline void gotoxy(unsigned int new_x,unsigned int new_y)
+static inline void gotoxy(unsigned int new_x, unsigned int new_y)
 {
 	if (new_x > video_num_columns || new_y >= video_num_lines)
 		return;
-	x=new_x;
-	y=new_y;
-	pos=origin + y*video_size_row + (x<<1);
+
+	x = new_x;
+	y = new_y;
+	pos = origin + y * video_size_per_row + (x << 1);
 }
 
 static inline void set_origin(void)
@@ -109,9 +110,9 @@ static void scrup(void)
 	if (video_type == VIDEO_TYPE_EGAC || video_type == VIDEO_TYPE_EGAM)
 	{
 		if (!top && bottom == video_num_lines) {
-			origin += video_size_row;
-			pos += video_size_row;
-			scr_end += video_size_row;
+			origin += video_size_per_row;
+			pos += video_size_per_row;
+			scr_end += video_size_per_row;
 			if (scr_end > video_mem_end) {
 				__asm__("cld\n\t"
 					"rep\n\t"
@@ -133,7 +134,7 @@ static void scrup(void)
 					"stosw"
 					::"a" (video_erase_char),
 					"c" (video_num_columns),
-					"D" (scr_end-video_size_row)
+					"D" (scr_end-video_size_per_row)
 					);
 			}
 			set_origin();
@@ -146,8 +147,8 @@ static void scrup(void)
 				"stosw"
 				::"a" (video_erase_char),
 				"c" ((bottom-top-1)*video_num_columns>>1),
-				"D" (origin+video_size_row*top),
-				"S" (origin+video_size_row*(top+1))
+				"D" (origin+video_size_per_row*top),
+				"S" (origin+video_size_per_row*(top+1))
 				);
 		}
 	}
@@ -161,8 +162,8 @@ static void scrup(void)
 			"stosw"
 			::"a" (video_erase_char),
 			"c" ((bottom-top-1)*video_num_columns>>1),
-			"D" (origin+video_size_row*top),
-			"S" (origin+video_size_row*(top+1))
+			"D" (origin+video_size_per_row*top),
+			"S" (origin+video_size_per_row*(top+1))
 			);
 	}
 }
@@ -180,8 +181,8 @@ static void scrdown(void)
 			"stosw"
 			::"a" (video_erase_char),
 			"c" ((bottom-top-1)*video_num_columns>>1),
-			"D" (origin+video_size_row*bottom-4),
-			"S" (origin+video_size_row*(bottom-1)-4)
+			"D" (origin+video_size_per_row*bottom-4),
+			"S" (origin+video_size_per_row*(bottom-1)-4)
 			);
 	}
 	else		/* Not EGA/VGA */
@@ -195,8 +196,8 @@ static void scrdown(void)
 			"stosw"
 			::"a" (video_erase_char),
 			"c" ((bottom-top-1)*video_num_columns>>1),
-			"D" (origin+video_size_row*bottom-4),
-			"S" (origin+video_size_row*(bottom-1)-4)
+			"D" (origin+video_size_per_row*bottom-4),
+			"S" (origin+video_size_per_row*(bottom-1)-4)
 			);
 	}
 }
@@ -205,7 +206,7 @@ static void lf(void)
 {
 	if (y+1<bottom) {
 		y++;
-		pos += video_size_row;
+		pos += video_size_per_row;
 		return;
 	}
 	scrup();
@@ -215,7 +216,7 @@ static void ri(void)
 {
 	if (y>top) {
 		y--;
-		pos -= video_size_row;
+		pos -= video_size_per_row;
 		return;
 	}
 	scrdown();
@@ -455,7 +456,7 @@ void con_write(struct tty_struct * tty)
 				if (c>31 && c<127) {
 					if (x>=video_num_columns) {
 						x -= video_num_columns;
-						pos -= video_size_row;
+						pos -= video_size_per_row;
 						lf();
 					}
 					__asm__("movb attr,%%ah\n\t"
@@ -483,7 +484,7 @@ void con_write(struct tty_struct * tty)
 					pos += c<<1;
 					if (x>video_num_columns) {
 						x -= video_num_columns;
-						pos -= video_size_row;
+						pos -= video_size_per_row;
 						lf();
 					}
 					c=9;
@@ -621,42 +622,35 @@ void con_init(void)
 	char *display_ptr;
 
 	video_num_columns = ORIG_VIDEO_COLS;
-	video_size_row = video_num_columns * 2;
+	video_size_per_row = video_num_columns * 2;
 	video_num_lines = ORIG_VIDEO_LINES;
 	video_page = ORIG_VIDEO_PAGE;
-	video_erase_char = 0x0720;
+	video_erase_char = 0x0720;  /* 0x20-ascii, 0x07-color prop */
 	
-	if (ORIG_VIDEO_MODE == 7)			/* Is this a monochrome display? */
-	{
+	if (ORIG_VIDEO_MODE == 7) {	    /* Is this a monochrome display? */
 		video_mem_start = 0xb0000;
 		video_port_reg = 0x3b4;
 		video_port_val = 0x3b5;
-		if ((ORIG_VIDEO_EGA_BX & 0xff) != 0x10)
-		{
+
+		if ((ORIG_VIDEO_EGA_BX & 0xff) != 0x10) {
 			video_type = VIDEO_TYPE_EGAM;
 			video_mem_end = 0xb8000;
 			display_desc = "EGAm";
-		}
-		else
-		{
+		} else {
 			video_type = VIDEO_TYPE_MDA;
 			video_mem_end	= 0xb2000;
 			display_desc = "*MDA";
 		}
-	}
-	else								/* If not, it is color. */
-	{
+	} else {    /* If not, it is color. */
 		video_mem_start = 0xb8000;
 		video_port_reg	= 0x3d4;
 		video_port_val	= 0x3d5;
-		if ((ORIG_VIDEO_EGA_BX & 0xff) != 0x10)
-		{
+
+		if ((ORIG_VIDEO_EGA_BX & 0xff) != 0x10) {
 			video_type = VIDEO_TYPE_EGAC;
 			video_mem_end = 0xbc000;
 			display_desc = "EGAc";
-		}
-		else
-		{
+		} else {
 			video_type = VIDEO_TYPE_CGA;
 			video_mem_end = 0xba000;
 			display_desc = "*CGA";
@@ -664,27 +658,29 @@ void con_init(void)
 	}
 
 	/* Let the user known what kind of display driver we are using */
-	
-	display_ptr = ((char *)video_mem_start) + video_size_row - 8;
-	while (*display_desc)
-	{
+	display_ptr = ((char *)video_mem_start) + video_size_per_row - 8;
+	while (*display_desc) {
 		*display_ptr++ = *display_desc++;
-		display_ptr++;
+		display_ptr++;	/* skip prop byte */
 	}
 	
 	/* Initialize the variables used for scrolling (mostly EGA/VGA)	*/
-	
-	origin	= video_mem_start;
-	scr_end	= video_mem_start + video_num_lines * video_size_row;
-	top	= 0;
-	bottom	= video_num_lines;
+	origin = video_mem_start;
+	scr_end	= video_mem_start + video_num_lines * video_size_per_row;
+	top = 0;
+	bottom = video_num_lines;
 
-	gotoxy(ORIG_X,ORIG_Y);
-	set_trap_gate(0x21,&keyboard_interrupt);
-	outb_p(inb_p(0x21)&0xfd,0x21);
-	a=inb_p(0x61);
-	outb_p(a|0x80,0x61);
-	outb(a,0x61);
+	/* update pos */
+	gotoxy(ORIG_X, ORIG_Y);
+
+	/* enable keyboard_interrupt (IRQ1) */
+	set_trap_gate(0x21, &keyboard_interrupt);
+	outb_p(inb_p(0x21) & 0xfd, 0x21);
+
+	/* reset keyboard */
+	a = inb_p(0x61);
+	outb_p(a | 0x80, 0x61);
+	outb(a, 0x61);
 }
 /* from bsd-net-2: */
 

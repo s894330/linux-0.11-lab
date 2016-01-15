@@ -229,6 +229,8 @@ a20_ok:
 				# segment-descriptor        (INDEX:TI:RPL)
 	.set	sel_cs0, 0x0008 # select for code segment 0 (  001: 0:00) 
 	ljmp	$sel_cs0, $0	# jmp offset 0 of code segment 0 in gdt
+				# this ljmp will clean the CPU pre-fetched
+				# instruction
 
 # This routine checks that the keyboard command queue is empty
 # No timeout is used - if this hangs there is something wrong with

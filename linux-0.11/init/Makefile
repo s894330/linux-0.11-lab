@@ -9,8 +9,7 @@ ifneq ($(RAMDISK),)
 endif
 
 .c.o:
-	@$(CC) $(CFLAGS) \
-	-c -o $*.o $<
+	@$(CC) $(CFLAGS) -c -o $*.o $<
 
 clean:
 	@rm -f core *.o *.a tmp_make

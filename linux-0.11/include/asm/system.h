@@ -1,24 +1,24 @@
 #define move_to_user_mode() \
 __asm__("movl %%esp, %%eax\n\t" \
-	"pushl $0x17\n\t" \
-	"pushl %%eax\n\t" \
-	"pushfl\n\t" \
-	"pushl $0x0f\n\t" \
-	"pushl $1f\n\t" \
-	"iret\n\t" \
-	"1:movl $0x17, %%eax\n\t" \
+	"pushl $0x17\n\t"	    /* push task0 ss */			    \
+	"pushl %%eax\n\t"	    /* push esp */			    \
+	"pushfl\n\t"		    /* push eflags */			    \
+	"pushl $0x0f\n\t"	    /* push task0 cs */			    \
+	"pushl $1f\n\t"		    /* push eip */			    \
+	"iret\n\t"		    /* from level 0 ret to level 3 */	    \
+	"1:movl $0x17, %%eax\n\t"   /* first code executed in level 3 */    \
 	"movw %%ax, %%ds\n\t" \
 	"movw %%ax, %%es\n\t" \
 	"movw %%ax, %%fs\n\t" \
 	"movw %%ax, %%gs" \
 	:::"ax")
 
-#define sti() __asm__("sti"::)
-#define cli() __asm__("cli"::)
-#define nop() __asm__("nop"::)
-#define hang() __asm__("loop:	jmp loop"::)
+#define sti() __asm__("sti":)
+#define cli() __asm__("cli":)
+#define nop() __asm__("nop":)
+#define hang() __asm__("loop:	jmp loop":)
 
-#define iret() __asm__("iret"::)
+#define iret() __asm__("iret":)
 
 /*
  * setup IDT gate entry

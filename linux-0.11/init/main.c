@@ -152,8 +152,13 @@ void start_kernel(void)	/* This really IS void, no error here. */
 	buffer_init(buffer_memory_end);
 	hd_init();
 	floppy_init();
+	/* 
+	 * set interrupt flag(IF) to 1, CPU will begin handle maskable hardware
+	 * interrupts
+	 */
 	sti();
 	move_to_user_mode();
+
 	if (!fork()) {		/* we count on this going ok */
 		init();
 	}

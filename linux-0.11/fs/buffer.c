@@ -26,14 +26,15 @@
 #include <asm/system.h>
 #include <asm/io.h>
 
+/* end variable is defined by ld, which specify the end of kernel code */
 extern int end;
 extern void put_super(int);
 extern void invalidate_inodes(int);
 
-struct buffer_head * start_buffer = (struct buffer_head *) &end;
-struct buffer_head * hash_table[NR_HASH];
-static struct buffer_head * free_list;
-static struct task_struct * buffer_wait = NULL;
+struct buffer_head *start_buffer = (struct buffer_head *)&end;
+struct buffer_head *hash_table[NR_HASH];
+static struct buffer_head *free_list;
+static struct task_struct *buffer_wait = NULL;
 int NR_BUFFERS = 0;
 
 static inline void wait_on_buffer(struct buffer_head * bh)
@@ -350,15 +351,16 @@ struct buffer_head * breada(int dev,int first, ...)
 
 void buffer_init(long buffer_end)
 {
-	struct buffer_head * h = start_buffer;
-	void * b;
+	struct buffer_head *h = start_buffer;
+	void *b;
 	int i;
 
-	if (buffer_end == 1<<20)
-		b = (void *) (640*1024);
+	if (buffer_end == 1 << 20)
+		b = (void *)(640 * 1024); /* 640KB~1MB used for VGA and BIOS */
 	else
-		b = (void *) buffer_end;
-	while ( (b -= BLOCK_SIZE) >= ((void *) (h+1)) ) {
+		b = (void *)buffer_end;
+
+	while ((b -= BLOCK_SIZE) >= ((void *)(h + 1))) {
 		h->b_dev = 0;
 		h->b_dirt = 0;
 		h->b_count = 0;
@@ -367,18 +369,22 @@ void buffer_init(long buffer_end)
 		h->b_wait = NULL;
 		h->b_next = NULL;
 		h->b_prev = NULL;
-		h->b_data = (char *) b;
-		h->b_prev_free = h-1;
-		h->b_next_free = h+1;
+		h->b_data = (char *)b;	/* recode data from buffer end */
+		h->b_prev_free = h - 1;
+		h->b_next_free = h + 1;
 		h++;
 		NR_BUFFERS++;
-		if (b == (void *) 0x100000)
-			b = (void *) 0xA0000;
+
+		if (b == (void *)0x100000)  /* skip 640KB~1MB */
+			b = (void *)0xa0000;
 	}
+
+	/* let struct buffer_head list become circle list */
 	h--;
 	free_list = start_buffer;
 	free_list->b_prev_free = h;
 	h->b_next_free = free_list;
-	for (i=0;i<NR_HASH;i++)
-		hash_table[i]=NULL;
+
+	for (i = 0; i < NR_HASH; i++)
+		hash_table[i] = NULL;
 }	

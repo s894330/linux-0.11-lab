@@ -44,7 +44,7 @@ struct request {
 
 struct blk_dev_struct {
 	void (*request_fn)(void);
-	struct request * current_request;
+	struct request *current_request;
 };
 
 extern struct blk_dev_struct blk_dev[NR_BLK_DEV];

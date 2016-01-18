@@ -30,13 +30,13 @@ struct task_struct * wait_for_request = NULL;
  *	next-request
  */
 struct blk_dev_struct blk_dev[NR_BLK_DEV] = {
-	{ NULL, NULL },		/* no_dev */
-	{ NULL, NULL },		/* dev mem */
-	{ NULL, NULL },		/* dev fd */
-	{ NULL, NULL },		/* dev hd */
-	{ NULL, NULL },		/* dev ttyx */
-	{ NULL, NULL },		/* dev tty */
-	{ NULL, NULL }		/* dev lp */
+	{NULL, NULL},		/* no_dev */
+	{NULL, NULL},		/* dev mem */
+	{NULL, NULL},		/* dev fd */
+	{NULL, NULL},		/* dev hd */
+	{NULL, NULL},		/* dev ttyx */
+	{NULL, NULL},		/* dev tty */
+	{NULL, NULL}		/* dev lp */
 };
 
 static inline void lock_buffer(struct buffer_head * bh)

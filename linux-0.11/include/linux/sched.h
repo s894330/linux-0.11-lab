@@ -40,40 +40,40 @@ extern int tty_write(unsigned minor,char * buf,int count);
 typedef int (*fn_ptr)();
 
 struct i387_struct {
-	long	cwd;
-	long	swd;
-	long	twd;
-	long	fip;
-	long	fcs;
-	long	foo;
-	long	fos;
-	long	st_space[20];	/* 8*10 bytes for each FP-reg = 80 bytes */
+	long cwd;
+	long swd;
+	long twd;
+	long fip;
+	long fcs;
+	long foo;
+	long fos;
+	long st_space[20];	/* 8*10 bytes for each FP-reg = 80 bytes */
 };
 
 struct tss_struct {
-	long	back_link;	/* 16 high bits zero */
-	long	esp0;
-	long	ss0;		/* 16 high bits zero */
-	long	esp1;
-	long	ss1;		/* 16 high bits zero */
-	long	esp2;
-	long	ss2;		/* 16 high bits zero */
-	long	cr3;
-	long	eip;
-	long	eflags;
-	long	eax,ecx,edx,ebx;
-	long	esp;
-	long	ebp;
-	long	esi;
-	long	edi;
-	long	es;		/* 16 high bits zero */
-	long	cs;		/* 16 high bits zero */
-	long	ss;		/* 16 high bits zero */
-	long	ds;		/* 16 high bits zero */
-	long	fs;		/* 16 high bits zero */
-	long	gs;		/* 16 high bits zero */
-	long	ldt;		/* 16 high bits zero */
-	long	trace_bitmap;	/* bits: trace 0, bitmap 16-31 */
+	long back_link;		/* 16 high bits zero */
+	long esp0;
+	long ss0;		/* 16 high bits zero */
+	long esp1;
+	long ss1;		/* 16 high bits zero */
+	long esp2;
+	long ss2;		/* 16 high bits zero */
+	long cr3;
+	long eip;
+	long eflags;
+	long eax, ecx, edx, ebx;
+	long esp;
+	long ebp;
+	long esi;
+	long edi;
+	long es;		/* 16 high bits zero */
+	long cs;		/* 16 high bits zero */
+	long ss;		/* 16 high bits zero */
+	long ds;		/* 16 high bits zero */
+	long fs;		/* 16 high bits zero */
+	long gs;		/* 16 high bits zero */
+	long ldt;		/* 16 high bits zero */
+	long trace_bitmap;	/* bits: trace 0, bitmap 16-31 */
 	struct i387_struct i387;
 };
 
@@ -87,21 +87,21 @@ struct task_struct {
 	long blocked;	/* bitmap of masked signals */
 /* various fields */
 	int exit_code;
-	unsigned long start_code,end_code,end_data,brk,start_stack;
-	long pid,father,pgrp,session,leader;
-	unsigned short uid,euid,suid;
-	unsigned short gid,egid,sgid;
+	unsigned long start_code, end_code, end_data, brk, start_stack;
+	long pid, father, pgrp, session, leader;
+	unsigned short uid, euid, suid;
+	unsigned short gid, egid, sgid;
 	long alarm;
-	long utime,stime,cutime,cstime,start_time;
+	long utime, stime, cutime, cstime, start_time;
 	unsigned short used_math;
 /* file system info */
 	int tty;		/* -1 if no tty, so it must be signed */
 	unsigned short umask;
-	struct m_inode * pwd;
-	struct m_inode * root;
-	struct m_inode * executable;
+	struct m_inode *pwd;
+	struct m_inode *root;
+	struct m_inode *executable;
 	unsigned long close_on_exec;
-	struct file * filp[NR_OPEN];
+	struct file *filp[NR_OPEN];
 /* ldt for this task 0 - zero 1 - cs 2 - ds&ss */
 	struct desc_struct ldt[3];
 /* tss for this task */
@@ -113,26 +113,88 @@ struct task_struct {
  * your own risk!. Base=0, limit=0x9ffff (=640kB)
  */
 #define INIT_TASK \
-/* state etc */	{ 0,15,15, \
-/* signals */	0,{{},},0, \
-/* ec,brk... */	0,0,0,0,0,0, \
-/* pid etc.. */	0,-1,0,0,0, \
-/* uid etc */	0,0,0,0,0,0, \
-/* alarm */	0,0,0,0,0,0, \
-/* math */	0, \
-/* fs info */	-1,0022,NULL,NULL,NULL,0, \
-/* filp */	{NULL,}, \
-	{ \
-		{0,0}, \
-/* ldt */	{0x9f,0xc0fa00}, \
-		{0x9f,0xc0f200}, \
-	}, \
-/*tss*/	{0,PAGE_SIZE+(long)&init_task,0x10,0,0,0,0,(long)&pg_dir,\
-	 0,0,0,0,0,0,0,0, \
-	 0,0,0x17,0x17,0x17,0x17,0x17,0x17, \
-	 _LDT(0),0x80000000, \
-		{} \
-	}, \
+{ \
+    .state = 0, \
+    .counter = 15, \
+    .priority = 15, \
+    .signal = 0, \
+    .sigaction = {{},}, \
+    .blocked = 0, \
+    .exit_code = 0, \
+    .start_code = 0, \
+    .end_code = 0, \
+    .end_data = 0, \
+    .brk = 0, \
+    .start_stack = 0, \
+    .pid = 0, \
+    .father = -1, \
+    .pgrp = 0, \
+    .session = 0, \
+    .leader = 0, \
+    .uid = 0, \
+    .euid = 0, \
+    .suid = 0, \
+    .gid = 0, \
+    .egid = 0, \
+    .sgid = 0, \
+    .alarm = 0, \
+    .utime = 0, \
+    .stime = 0, \
+    .cutime = 0, \
+    .cstime = 0, \
+    .start_time = 0, \
+    .used_math = 0, \
+    .tty = -1, \
+    .umask = 0022, \
+    .pwd = NULL, \
+    .root = NULL, \
+    .executable = NULL, \
+    .close_on_exec = 0, \
+    .filp = {NULL,}, \
+    .ldt = { \
+	    {0, 0}, \
+	    /* len limit, property */ \
+	    {0x009f, 0x00c0fa00}, /* 640KB len, code seg. DPL 3 */ \
+	    {0x9f, 0xc0f200}, /* 640KB len, data seg. DPL 3 */ \
+    }, \
+    .tss = { \
+	    .back_link = 0, \
+	    /* 
+	     * TODO why esp0 set this value? but not set to a fixed variable,
+	     * just like user_stack[PAGE_SIZE >> 2], set esp0 to 
+	     * kernel_stack[PAGE_SIZE]?
+	     */ \
+	    .esp0 = PAGE_SIZE + (long)&init_task, \
+	    .ss0 = KERNEL_DATA_SEG, \
+	    .esp1 = 0, /* linux no use privilage 1 and 2 */ \
+	    .ss1 = 0, \
+	    .esp2 = 0, \
+	    .ss2 = 0, \
+	    .cr3 = (long)&pg_dir, \
+	    .eip = 0, \
+	    .eflags = 0, \
+	    .eax = 0, \
+	    .ecx = 0, \
+	    .edx = 0, \
+	    .ebx = 0, \
+	    .esp = 0, \
+	    .ebp = 0, \
+	    .esi = 0, \
+	    .edi = 0, \
+	    .es = TASK_DATA_SEG, \
+	    .cs = TASK_DATA_SEG, \
+	    .ss = TASK_DATA_SEG, \
+	    .ds = TASK_DATA_SEG, \
+	    .fs = TASK_DATA_SEG, \
+	    .gs = TASK_DATA_SEG, \
+	    .ldt = _LDT(0), \
+	    /* 
+	     * offset 32KB of TSS segment is the I/O permission map of
+	     * this task
+	     */ \
+	    .trace_bitmap = 0x80000000, \
+	    .i387 = {} \
+    }, \
 }
 
 extern struct task_struct *task[NR_TASKS];
@@ -153,9 +215,12 @@ extern void wake_up(struct task_struct ** p);
  * 4-TSS0, 5-LDT0, 6-TSS1 etc ...
  */
 #define FIRST_TSS_ENTRY 4
-#define FIRST_LDT_ENTRY (FIRST_TSS_ENTRY+1)
-#define _TSS(n) ((((unsigned long) n)<<4)+(FIRST_TSS_ENTRY<<3))
-#define _LDT(n) ((((unsigned long) n)<<4)+(FIRST_LDT_ENTRY<<3))
+#define FIRST_LDT_ENTRY (FIRST_TSS_ENTRY + 1)
+#define NO_USED_SIZE 2	    /* entry 0 and entry 3(syscall) */
+#define KERNEL_USED_SIZE 2  /* kernel code and data seg. */
+#define TASK0_USED_SIZE 2   /* task tss and ldt seg. */
+#define _TSS(n) ((((unsigned long) n) << 4) + (FIRST_TSS_ENTRY << 3))
+#define _LDT(n) ((((unsigned long) n) << 4) + (FIRST_LDT_ENTRY << 3))
 #define ltr(n) __asm__("ltr %%ax"::"a" (_TSS(n)))
 #define lldt(n) __asm__("lldt %%ax"::"a" (_LDT(n)))
 #define str(n) \

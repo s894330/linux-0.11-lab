@@ -20,4 +20,7 @@ extern desc_table idt,gdt;
 #define LDT_CODE 1
 #define LDT_DATA 2
 
+#define TASK_CODE_SEG 0x0f
+#define TASK_DATA_SEG 0x17
+
 #endif

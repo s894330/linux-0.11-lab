@@ -43,7 +43,7 @@ void show_stat(void)
 			show_task(i,task[i]);
 }
 
-#define LATCH (1193180/HZ)
+#define LATCH (1193180 / HZ)
 
 extern void mem_use(void);
 
@@ -55,14 +55,16 @@ union task_union {
 	char stack[PAGE_SIZE];
 };
 
-static union task_union init_task = {INIT_TASK,};
+static union task_union init_task = {
+	.task = INIT_TASK
+};
 
-long volatile jiffies=0;
-long startup_time=0;
+long volatile jiffies = 0;
+long startup_time = 0;
 struct task_struct *current = &(init_task.task);
 struct task_struct *last_task_used_math = NULL;
 
-struct task_struct * task[NR_TASKS] = {&(init_task.task), };
+struct task_struct *task[NR_TASKS] = {&(init_task.task),};
 
 long user_stack[PAGE_SIZE >> 2];
 
@@ -386,28 +388,43 @@ int sys_nice(long increment)
 void sched_init(void)
 {
 	int i;
-	struct desc_struct * p;
+	struct desc_struct *p;
 
 	if (sizeof(struct sigaction) != 16)
 		panic("Struct sigaction MUST be 16 bytes");
-	set_tss_desc(gdt+FIRST_TSS_ENTRY,&(init_task.task.tss));
-	set_ldt_desc(gdt+FIRST_LDT_ENTRY,&(init_task.task.ldt));
-	p = gdt+2+FIRST_TSS_ENTRY;
-	for(i=1;i<NR_TASKS;i++) {
+
+	/* set tss and ldt in gdt for first task: task0 */
+	set_tss_desc(gdt + FIRST_TSS_ENTRY, &(init_task.task.tss));
+	set_ldt_desc(gdt + FIRST_LDT_ENTRY, &(init_task.task.ldt));
+
+	/* move to first unsed gdt entry */
+	p = gdt + NO_USED_SIZE + KERNEL_USED_SIZE + TASK0_USED_SIZE;
+
+	for(i = 1; i < NR_TASKS; i++) {
 		task[i] = NULL;
-		p->a=p->b=0;
+		p->a = p->b = 0;    /* clear tss */
 		p++;
-		p->a=p->b=0;
+		p->a = p->b = 0;    /* clear ldt */
 		p++;
 	}
-/* Clear NT, so that we won't have troubles with that later on */
-	__asm__("pushfl ; andl $0xffffbfff,(%esp) ; popfl");
+
+	/* Clear NT, so that we won't have troubles with that later on */
+	/* 
+	 * if NT is set, it means back_link in TSS is valid, iret will cause
+	 * task switch
+	 */
+	__asm__("pushfl; andl $0xffffbfff, (%esp); popfl");
+
+	/* load task0's tss and ldt */
 	ltr(0);
 	lldt(0);
-	outb_p(0x36,0x43);		/* binary, mode 3, LSB/MSB, ch 0 */
-	outb_p(LATCH & 0xff , 0x40);	/* LSB */
-	outb(LATCH >> 8 , 0x40);	/* MSB */
-	set_intr_gate(0x20,&timer_interrupt);
-	outb(inb_p(0x21)&~0x01,0x21);
-	set_system_gate(0x80,&system_call);
+
+	/* init timer */
+	outb_p(0x36, 0x43);	    /* binary, mode 3, LSB/MSB, ch 0 */
+	outb_p(LATCH & 0xff, 0x40); /* LSB */
+	outb(LATCH >> 8, 0x40);	    /* MSB */
+	set_intr_gate(0x20, &timer_interrupt);	/* IRQ0 */
+	outb(inb_p(0x21) & ~0x01, 0x21);    /* enable timer interrupt signal */
+
+	set_system_gate(0x80, &system_call);
 }

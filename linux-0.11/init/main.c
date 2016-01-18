@@ -104,7 +104,6 @@ static void time_init(void)
 	BCD_TO_BIN(time.tm_mon);
 	BCD_TO_BIN(time.tm_year);
 
-	time.tm_mon--;
 	/* startup_time = total passed seconds since from 1970/1/1 0:00:00 */
 	startup_time = kernel_mktime(&time);
 }

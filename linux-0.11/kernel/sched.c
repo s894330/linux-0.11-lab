@@ -89,7 +89,7 @@ void math_state_restore()
 	if (current->used_math) {
 		__asm__("frstor %0"::"m" (current->tss.i387));
 	} else {
-		__asm__("fninit"::);
+		__asm__("fninit");
 		current->used_math=1;
 	}
 }

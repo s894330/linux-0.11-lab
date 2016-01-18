@@ -37,7 +37,7 @@ static inline void oom(void)
 }
 
 #define invalidate() \
-__asm__("movl %%eax,%%cr3"::"a" (0))
+__asm__("movl %%eax, %%cr3"::"a" (0))
 
 /* these are not to be changed without changing head.s etc */
 #define LOW_MEM 0x100000
@@ -52,7 +52,7 @@ current->start_code + current->end_code)
 static long HIGH_MEMORY = 0;
 
 #define copy_page(from,to) \
-__asm__("cld ; rep ; movsl"::"S" (from),"D" (to),"c" (1024))
+__asm__("cld; rep; movsl"::"S" (from), "D" (to), "c" (1024))
 
 static unsigned char mem_map [ PAGING_PAGES ] = {0,};
 
@@ -62,24 +62,24 @@ static unsigned char mem_map [ PAGING_PAGES ] = {0,};
  */
 unsigned long get_free_page(void)
 {
-register unsigned long __res asm("ax");
+	register unsigned long __res;
 
-__asm__("std ; repne ; scasb\n\t"
-	"jne 1f\n\t"
-	"movb $1,1(%%edi)\n\t"
-	"sall $12,%%ecx\n\t"
-	"addl %2,%%ecx\n\t"
-	"movl %%ecx,%%edx\n\t"
-	"movl $1024,%%ecx\n\t"
-	"leal 4092(%%edx),%%edi\n\t"
-	"rep ; stosl\n\t"
-	" movl %%edx,%%eax\n"
-	"1: cld"
-	:"=a" (__res)
-	:"0" (0),"i" (LOW_MEM),"c" (PAGING_PAGES),
-	"D" (mem_map+PAGING_PAGES-1)
-	);
-return __res;
+	__asm__("std; repne; scasb\n\t"
+		"jne 1f\n\t"
+		"movb $1, 1(%%edi)\n\t"
+		"sall $12, %%ecx\n\t"
+		"addl %2, %%ecx\n\t"
+		"movl %%ecx, %%edx\n\t"
+		"movl $1024, %%ecx\n\t"
+		"leal 4092(%%edx), %%edi\n\t"
+		"rep; stosl\n\t"
+		" movl %%edx, %%eax\n\t"
+		"1: cld"
+		:"=a" (__res)
+		:"0" (0), "i" (LOW_MEM), "c" (PAGING_PAGES),
+		"D" (mem_map + PAGING_PAGES - 1));
+
+	return __res;
 }
 
 /*

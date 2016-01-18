@@ -32,9 +32,9 @@ static int skip_atoi(const char **s)
 #define SPECIAL	32		/* 0x */
 #define SMALL	64		/* use 'abcdef' instead of 'ABCDEF' */
 
-#define do_div(n,base) ({ \
+#define do_div(n, base) ({ \
 int __res; \
-__asm__("divl %4":"=a" (n),"=d" (__res):"0" (n),"1" (0),"r" (base)); \
+__asm__("divl %4":"=a" (n), "=d" (__res):"0" (n), "1" (0), "r" (base)); \
 __res; })
 
 static char * number(char * str, int num, int base, int size, int precision

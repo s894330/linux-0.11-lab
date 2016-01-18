@@ -287,9 +287,8 @@ struct buffer_head * bread(int dev,int block)
 #define COPYBLK(from,to) \
 __asm__("cld\n\t" \
 	"rep\n\t" \
-	"movsl\n\t" \
-	::"c" (BLOCK_SIZE/4),"S" (from),"D" (to) \
-	)
+	"movsl" \
+	::"c" (BLOCK_SIZE / 4), "S" (from), "D" (to))
 
 /*
  * bread_page reads four buffers into memory at the desired address. It's

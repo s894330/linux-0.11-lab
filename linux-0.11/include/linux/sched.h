@@ -293,22 +293,31 @@ __base;})
 
 static inline unsigned long _get_base(char * addr)
 {
-         unsigned long __base;
-         __asm__("movb %3, %%dh\n\t"
-                 "movb %2, %%dl\n\t"
-                 "shll $16, %%edx\n\t"
-                 "movw %1, %%dx"
-                 :"=&d" (__base)
-                 :"m" (*((addr)+2)), "m" (*((addr)+4)), "m" (*((addr)+7)));
+	unsigned long __base;
 
-         return __base;
+	__asm__("movb %3, %%dh\n\t"
+		"movb %2, %%dl\n\t"
+		"shll $16, %%edx\n\t"
+		"movw %1, %%dx"
+		:"=&d" (__base)	/* 
+				 * use the '&' constraint modifier on output
+				 * operands that must not overlap an input.
+				 * Otherwise, GCC may allocate the output
+				 * operand in the same register as an unrelated
+				 * input operand
+				 */
+		:"m" (*((addr) + 2)), "m" (*((addr) + 4)),
+		"m" (*((addr) + 7)));
+
+	return __base;
 }
 
-#define get_base(ldt) _get_base( ((char *)&(ldt)) )
+#define get_base(ldt) _get_base(((char *)&(ldt)))
 
 #define get_limit(segment) ({ \
-unsigned long __limit; \
-__asm__("lsll %1,%0; incl %0":"=r" (__limit):"r" (segment)); \
-__limit;})
+	unsigned long __limit; \
+	/* lsl: load segment limit */	\
+	__asm__("lsll %1, %0; incl %0":"=r" (__limit):"r" (segment)); \
+	__limit;})
 
 #endif

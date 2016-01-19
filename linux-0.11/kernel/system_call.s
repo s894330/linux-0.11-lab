@@ -214,15 +214,15 @@ sys_execve:
 .align 4
 sys_fork:
 	call find_empty_process
-	testl %eax,%eax
-	js 1f
+	testl %eax, %eax
+	js 1f			# if eax < 0, jump
 	push %gs
 	pushl %esi
 	pushl %edi
 	pushl %ebp
 	pushl %eax
 	call copy_process
-	addl $20,%esp
+	addl $20, %esp		# skip all previous push gs~eax
 1:	ret
 
 hd_interrupt:

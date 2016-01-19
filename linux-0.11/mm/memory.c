@@ -41,20 +41,20 @@ __asm__("movl %%eax, %%cr3"::"a" (0))
 
 /* these are not to be changed without changing head.s etc */
 #define LOW_MEM 0x100000
-#define PAGING_MEMORY (15*1024*1024)
-#define PAGING_PAGES (PAGING_MEMORY>>12)
-#define MAP_NR(addr) (((addr)-LOW_MEM)>>12)
+#define PAGING_MEMORY (15 * 1024 * 1024)
+#define PAGING_PAGES (PAGING_MEMORY >> 12)
+#define MAP_NR(addr) (((addr) - LOW_MEM) >> 12)
 #define USED 100
 
-#define CODE_SPACE(addr) ((((addr)+4095)&~4095) < \
-current->start_code + current->end_code)
+#define CODE_SPACE(addr) ((((addr) + 4095) & ~4095) < \
+	current->start_code + current->end_code)
 
 static long HIGH_MEMORY = 0;
 
 #define copy_page(from,to) \
 __asm__("cld; rep; movsl"::"S" (from), "D" (to), "c" (1024))
 
-static unsigned char mem_map [ PAGING_PAGES ] = {0,};
+static unsigned char mem_map[PAGING_PAGES] = {0};
 
 /*
  * Get physical address of first (actually last :-) free page, and mark it
@@ -62,19 +62,24 @@ static unsigned char mem_map [ PAGING_PAGES ] = {0,};
  */
 unsigned long get_free_page(void)
 {
+	/*
+	 * C language provides the storage class "register" so that the
+	 * programmer can ``suggest'' to the compiler that particular automatic
+	 * variables should be allocated to CPU registers, if possible
+	 */
 	register unsigned long __res;
 
-	__asm__("std; repne; scasb\n\t"
+	__asm__("std; repne; scasb\n\t"	    /* repeat compare es:edi with al */
 		"jne 1f\n\t"
-		"movb $1, 1(%%edi)\n\t"
-		"sall $12, %%ecx\n\t"
-		"addl %2, %%ecx\n\t"
-		"movl %%ecx, %%edx\n\t"
+		"movb $1, 1(%%edi)\n\t"	    /* set mem_map[edi+1] to 1 */
+		"sall $12, %%ecx\n\t"	    /* shift left 12 bit of ecx value */
+		"addl %2, %%ecx\n\t"	    /* add memory base (LOW_MEM) */
+		"movl %%ecx, %%edx\n\t"	    /* edx = real physical mem addr */
 		"movl $1024, %%ecx\n\t"
-		"leal 4092(%%edx), %%edi\n\t"
-		"rep; stosl\n\t"
-		" movl %%edx, %%eax\n\t"
-		"1: cld"
+		"leal 4092(%%edx), %%edi\n\t"	/* edi = addr of (edx + 4092) */
+		"rep; stosl\n\t"    /* store eax -> es:edi repeat ecx count */
+		"movl %%edx, %%eax\n\t"	    /* eax = addr of physical memory */
+		"1:cld"
 		:"=a" (__res)
 		:"0" (0), "i" (LOW_MEM), "c" (PAGING_PAGES),
 		"D" (mem_map + PAGING_PAGES - 1));
@@ -144,38 +149,69 @@ int free_page_tables(unsigned long from,unsigned long size)
  * that would lead to some serious memory waste - we just copy the
  * first 160 pages - 640kB. Even that is more than we need, but it
  * doesn't take any more memory - we don't copy-on-write in the low
- * 1 Mb-range, so the pages can be shared with the kernel. Thus the
+ * 1 MB-range, so the pages can be shared with the kernel. Thus the
  * special case for nr=xxxx.
  */
-int copy_page_tables(unsigned long from,unsigned long to,long size)
+int copy_page_tables(unsigned long from, unsigned long to, long size)
 {
-	unsigned long * from_page_table;
-	unsigned long * to_page_table;
+	unsigned long *from_page_table;
+	unsigned long *to_page_table;
 	unsigned long this_page;
-	unsigned long * from_dir, * to_dir;
+	unsigned long *from_dir, *to_dir;
 	unsigned long nr;
 
-	if ((from&0x3fffff) || (to&0x3fffff))
+	/* make sure align to 4MB, because one page table entry map to 4MB */
+	if ((from & 0x3fffff) || (to & 0x3fffff))
 		panic("copy_page_tables called with wrong alignment");
-	from_dir = (unsigned long *) ((from>>20) & 0xffc); /* _pg_dir = 0 */
-	to_dir = (unsigned long *) ((to>>20) & 0xffc);
-	size = ((unsigned) (size+0x3fffff)) >> 22;
-	for( ; size-->0 ; from_dir++,to_dir++) {
+
+	/* get page dir entry address, because one entry is 4 byte, so we * 4 */
+	from_dir = (unsigned long *)((from >> 22) * 4); /* _pg_dir = 0 */
+	to_dir = (unsigned long *)((to >> 22) * 4);
+	
+	/* 
+	 * caculate nr of page table which need to copy, one page map 4MB(and
+	 * need one page dir entry map to it), so it should >> 22
+	 */
+	size = ((unsigned)(size + 0x3fffff)) >> 22;
+
+	for(; size-- > 0; from_dir++, to_dir++) {
 		if (1 & *to_dir)
 			panic("copy_page_tables: already exist");
-		if (!(1 & *from_dir))
+
+		if (!(1 & *from_dir))	/* page table not exist, skip */
 			continue;
-		from_page_table = (unsigned long *) (0xfffff000 & *from_dir);
-		if (!(to_page_table = (unsigned long *) get_free_page()))
+
+		/* fetch page table address */
+		from_page_table = (unsigned long *)(0xfffff000 & *from_dir);
+		
+		/* create new page for page table */
+		if (!(to_page_table = (unsigned long *)get_free_page()))
 			return -1;	/* Out of memory, see freeing */
-		*to_dir = ((unsigned long) to_page_table) | 7;
-		nr = (from==0)?0xA0:1024;
-		for ( ; nr-- > 0 ; from_page_table++,to_page_table++) {
+
+		/* set new created page property to “User, R/W, Present" */
+		*to_dir = ((unsigned long)to_page_table) | 7;
+
+		/* if we copy page tables from task 0, only copy 160 entry */
+		nr = (from == 0) ? 0xa0 : 1024;
+		for (; nr-- > 0; from_page_table++, to_page_table++) {
 			this_page = *from_page_table;
-			if (!(1 & this_page))
+
+			if (!(1 & this_page)) /* current page not exist, skip */
 				continue;
+
+			/* mark page to read only */
 			this_page &= ~2;
+
+			/* 
+			 * both from_page and to_page share the same 4KB memory
+			 * page
+			 * */
 			*to_page_table = this_page;
+
+			/* 
+			 * if this_page > LOW_MEM, also mark from_page to read
+			 * only, and update mem_map[]
+			 * */
 			if (this_page > LOW_MEM) {
 				*from_page_table = this_page;
 				this_page -= LOW_MEM;
@@ -184,7 +220,9 @@ int copy_page_tables(unsigned long from,unsigned long to,long size)
 			}
 		}
 	}
+
 	invalidate();
+
 	return 0;
 }
 

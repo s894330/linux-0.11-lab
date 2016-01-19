@@ -138,6 +138,13 @@ type name(void) \
 		"int $0x80" \
 		:"=a" (__res) \
 		:"0" (__NR_##name)); \
+	/* 
+	 * if system call is fork(), the following code in both father and child
+	 * process will cause "write" data into stack which if mark read-only
+	 * memory area (except task 0 fork task 1, in this situation, only
+	 * task 1's page has marked read only), thus will cause page fault
+	 * interrupt
+	 */ \
 	if (__res >= 0) \
 		return (type)__res; \
 	errno = -__res; \

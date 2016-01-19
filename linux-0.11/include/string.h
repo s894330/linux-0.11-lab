@@ -23,7 +23,22 @@ extern char *strerror(int errno);
  *
  *		(C) 1991 Linus Torvalds
  */
- 
+/* 
+ * "static inline" means "we have to have this function, if you use it but
+ * don't inline it, then make a static version of it in this compilation unit"
+ *
+ * "extern inline" means "I actually _have_ an extern for this function, but if
+ * you want to inline it, here's the inline-version"
+ *
+ * By setting a function as 'extern inline', and then NOT providing as
+ * associated extern non-inline function to back it up, if the compiler fails to
+ * inline the function a linker error will be generated. This guarantees that
+ * the code will either run with the function inlined, or that it cannot be run
+ * at all.
+ *
+ * when a kernel developer uses 'extern inline' without a backing extern
+ * function, it is an indication of a function that MUST be inlined.
+ */
 extern inline char *strcpy(char *dest, const char *src)
 {
 	__asm__("cld\n\t"

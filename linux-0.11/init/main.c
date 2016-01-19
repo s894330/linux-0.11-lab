@@ -21,12 +21,16 @@
  * won't be any messing with the stack from main(), but we define
  * some others too.
  */
+/* 
+ * GCC does not inline any functions when not optimizing unless you specify the
+ * ‘always_inline’ attribute for the function
+ */
 static inline int fork(void) __attribute__((always_inline));
 static inline int pause(void) __attribute__((always_inline));
-static inline _syscall0(int,fork)
-static inline _syscall0(int,pause)
-static inline _syscall1(int,setup,void *,BIOS)
-static inline _syscall0(int,sync)
+static inline _syscall0(int, fork)
+static inline _syscall0(int, pause)
+static inline _syscall1(int, setup, void *, BIOS)
+static inline _syscall0(int, sync)
 
 #include <linux/tty.h>
 #include <linux/sched.h>

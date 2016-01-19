@@ -64,21 +64,23 @@ nr_system_calls = 72
  * Ok, I get parallel printer interrupts while using the floppy for some
  * strange reason. Urgel. Now I just ignore them.
  */
-.globl system_call,sys_fork,timer_interrupt,sys_execve
-.globl hd_interrupt,floppy_interrupt,parallel_interrupt
-.globl device_not_available, coprocessor_error
+.global system_call, sys_fork, timer_interrupt, sys_execve
+.global hd_interrupt, floppy_interrupt, parallel_interrupt
+.global device_not_available, coprocessor_error
 
-.align 2
+.align 4
 bad_sys_call:
-	movl $-1,%eax
+	movl $-1, %eax
 	iret
-.align 2
+
+.align 4
 reschedule:
 	pushl $ret_from_sys_call
 	jmp schedule
-.align 2
+
+.align 4
 system_call:
-	cmpl $nr_system_calls-1,%eax
+	cmpl $nr_system_calls - 1, %eax
 	ja bad_sys_call
 	push %ds
 	push %es
@@ -86,38 +88,43 @@ system_call:
 	pushl %edx
 	pushl %ecx		# push %ebx,%ecx,%edx as parameters
 	pushl %ebx		# to the system call
-	movl $0x10,%edx		# set up ds,es to kernel space
-	mov %dx,%ds
-	mov %dx,%es
-	movl $0x17,%edx		# fs points to local data space
-	mov %dx,%fs
-	call *sys_call_table(,%eax,4)
-	pushl %eax
-	movl current,%eax
-	cmpl $0,state(%eax)		# state
+	movl $0x10, %edx	# set up ds,es to kernel data space
+	mov %dx, %ds
+	mov %dx, %es
+	movl $0x17, %edx	# fs points to local data space
+	mov %dx, %fs
+	call *sys_call_table(, %eax, 4) # sys_call_table + %eax * 4
+	pushl %eax		# save return value
+
+	# if task state != running or couner == 0, reschedule
+	movl current, %eax
+	cmpl $0, state(%eax)	# state
 	jne reschedule
-	cmpl $0,counter(%eax)		# counter
+	cmpl $0, counter(%eax)	# counter
 	je reschedule
+
 ret_from_sys_call:
-	movl current,%eax		# task[0] cannot have signals
-	cmpl task,%eax
+	movl current, %eax	# task[0] cannot have signals
+	cmpl task, %eax
 	je 3f
-	cmpw $0x0f,CS(%esp)		# was old code segment supervisor ?
+	cmpw $0x0f, CS(%esp)	# was old code segment supervisor ?
 	jne 3f
-	cmpw $0x17,OLDSS(%esp)		# was stack segment = 0x17 ?
+	cmpw $0x17, OLDSS(%esp)	# was stack segment = 0x17 ?
 	jne 3f
-	movl signal(%eax),%ebx
-	movl blocked(%eax),%ecx
+	movl signal(%eax), %ebx
+	movl blocked(%eax), %ecx
 	notl %ecx
-	andl %ebx,%ecx
-	bsfl %ecx,%ecx
+	andl %ebx, %ecx
+	bsfl %ecx, %ecx		# bit scan forward from bit 0 to search the
+				# first set bit, and save index to ecx
 	je 3f
-	btrl %ecx,%ebx
-	movl %ebx,signal(%eax)
+	btrl %ecx, %ebx		# bit test and reset
+	movl %ebx, signal(%eax)
 	incl %ecx
 	pushl %ecx
 	call do_signal
 	popl %eax
+
 3:	popl %eax
 	popl %ebx
 	popl %ecx
@@ -127,7 +134,7 @@ ret_from_sys_call:
 	pop %ds
 	iret
 
-.align 2
+.align 4
 coprocessor_error:
 	push %ds
 	push %es
@@ -144,7 +151,7 @@ coprocessor_error:
 	pushl $ret_from_sys_call
 	jmp math_error
 
-.align 2
+.align 4
 device_not_available:
 	push %ds
 	push %es
@@ -172,7 +179,7 @@ device_not_available:
 	popl %ebp
 	ret
 
-.align 2
+.align 4
 timer_interrupt:
 	push %ds		# save ds,es and put kernel data space
 	push %es		# into them. %fs is used by _system_call
@@ -196,7 +203,7 @@ timer_interrupt:
 	addl $4,%esp		# task switching to accounting ...
 	jmp ret_from_sys_call
 
-.align 2
+.align 4
 sys_execve:
 	lea EIP(%esp),%eax
 	pushl %eax
@@ -204,7 +211,7 @@ sys_execve:
 	addl $4,%esp
 	ret
 
-.align 2
+.align 4
 sys_fork:
 	call find_empty_process
 	testl %eax,%eax

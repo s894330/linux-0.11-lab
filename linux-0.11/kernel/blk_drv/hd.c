@@ -25,11 +25,6 @@
 #define MAJOR_NR 3
 #include "blk.h"
 
-#define CMOS_READ(addr) ({ \
-outb_p(0x80|addr,0x70); \
-inb_p(0x71); \
-})
-
 /* Max read/write errors/sector */
 #define MAX_ERRORS	7
 #define MAX_HD		2
@@ -43,20 +38,37 @@ static int reset = 0;
  *  This struct defines the HD's and their types.
  */
 struct hd_i_struct {
-	int head,sect,cyl,wpcom,lzone,ctl;
-	};
+	int cyl;    /* cylinders numbers */
+	int head;   /* head numbers */
+	int sect;   /* sector numbers per track */
+	int wpcom;  /* write pre-comp cylinder num */
+	int lzone;  /* landing zone cylinder num */
+	int ctl;    /* control byte */
+		    /*	bit 0: not used */
+		    /*	bit 1: reserved(0)(disable IRQ) */
+		    /*	bit 2: permit resume */
+		    /*	bit 3: set to 1 if head numbers > 8 */
+		    /*	bit 4: not used(0) */
+		    /*	bit 5: set to 1 if cyl + 1 has vendors bad block map */
+		    /*	bit 6: forbid ECC retry */
+		    /*	bit 7: forbid access retry */
+};
+
 #ifdef HD_TYPE
-struct hd_i_struct hd_info[] = { HD_TYPE };
-#define NR_HD ((sizeof (hd_info))/(sizeof (struct hd_i_struct)))
+struct hd_i_struct hd_info[] = {HD_TYPE};
+#define NR_HD ((sizeof(hd_info)) / (sizeof(struct hd_i_struct)))
 #else
-struct hd_i_struct hd_info[] = { {0,0,0,0,0,0},{0,0,0,0,0,0} };
+struct hd_i_struct hd_info[] = {
+	{0, 0, 0, 0, 0, 0},
+	{0, 0, 0, 0, 0, 0}
+};
 static int NR_HD = 0;
 #endif
 
 static struct hd_struct {
 	long start_sect;
 	long nr_sects;
-} hd[5*MAX_HD]={{0,0},};
+} hd[5 * MAX_HD]={{0, 0},};
 
 #define port_read(port, buf, nr) \
 __asm__("cld; rep; insw"::"d" (port), "D" (buf), "c" (nr))
@@ -71,33 +83,37 @@ extern void rd_load(void);
 int sys_setup(void * BIOS)
 {
 	static int callable = 1;
-	int i,drive;
+	int i, drive;
 	unsigned char cmos_disks;
 	struct partition *p;
-	struct buffer_head * bh;
+	struct buffer_head *bh;
 
+	/* enforce this func execute only once */
 	if (!callable)
 		return -1;
 	callable = 0;
+
 #ifndef HD_TYPE
-	for (drive=0 ; drive<2 ; drive++) {
-		hd_info[drive].cyl = *(unsigned short *) BIOS;
-		hd_info[drive].head = *(unsigned char *) (2+BIOS);
-		hd_info[drive].wpcom = *(unsigned short *) (5+BIOS);
-		hd_info[drive].ctl = *(unsigned char *) (8+BIOS);
-		hd_info[drive].lzone = *(unsigned short *) (12+BIOS);
-		hd_info[drive].sect = *(unsigned char *) (14+BIOS);
-		BIOS += 16;
+	printk("HD_TYPE no defined, get drive info from BIOS\n");
+	for (drive = 0; drive < 2; drive++) {
+		hd_info[drive].cyl = *(unsigned short *)BIOS;
+		hd_info[drive].head = *(unsigned char *)(2 + BIOS);
+		hd_info[drive].wpcom = *(unsigned short *)(5 + BIOS);
+		hd_info[drive].ctl = *(unsigned char *)(8 + BIOS);
+		hd_info[drive].lzone = *(unsigned short *)(12 + BIOS);
+		hd_info[drive].sect = *(unsigned char *)(14 + BIOS);
+		BIOS += 16; /* each drive param table is 16 byte long */
 	}
+
 	if (hd_info[1].cyl)
-		NR_HD=2;
+		NR_HD = 2;
 	else
-		NR_HD=1;
+		NR_HD = 1;
 #endif
-	for (i=0 ; i<NR_HD ; i++) {
-		hd[i*5].start_sect = 0;
-		hd[i*5].nr_sects = hd_info[i].head*
-				hd_info[i].sect*hd_info[i].cyl;
+	for (i = 0; i < NR_HD; i++) {
+		hd[i * 5].start_sect = 0;
+		hd[i * 5].nr_sects = 
+			hd_info[i].head * hd_info[i].sect * hd_info[i].cyl;
 	}
 
 	/*
@@ -121,7 +137,6 @@ int sys_setup(void * BIOS)
 
 		
 	*/
-
 	if ((cmos_disks = CMOS_READ(0x12)) & 0xf0)
 		if (cmos_disks & 0x0f)
 			NR_HD = 2;
@@ -129,33 +144,48 @@ int sys_setup(void * BIOS)
 			NR_HD = 1;
 	else
 		NR_HD = 0;
-	for (i = NR_HD ; i < 2 ; i++) {
-		hd[i*5].start_sect = 0;
-		hd[i*5].nr_sects = 0;
+
+	printk("There are %d hard disk in system\n", NR_HD);
+
+	/* reset un-exist hd[] structure */
+	for (i = NR_HD; i < 2; i++) {
+		hd[i * 5].start_sect = 0;
+		hd[i * 5].nr_sects = 0;
 	}
-	for (drive=0 ; drive<NR_HD ; drive++) {
-		if (!(bh = bread(0x300 + drive*5,0))) {
-			printk("Unable to read partition table of drive %d\n\r",
+
+	/* fetch partiton info */
+	for (drive = 0; drive < NR_HD; drive++) {
+		if (!(bh = bread(0x300 + drive * 5, 0))) {
+			printk("Unable to read partition table of drive %d\n",
 				drive);
 			panic("");
 		}
-		if (bh->b_data[510] != 0x55 || (unsigned char)
-		    bh->b_data[511] != 0xAA) {
+
+		if (bh->b_data[510] != 0x55 ||
+			((unsigned char)bh->b_data[511]) != 0xaa) {
 			printk("Bad partition table on drive %d\n\r",drive);
 			panic("");
 		}
-		p = 0x1BE + (void *)bh->b_data;
-		for (i=1;i<5;i++,p++) {
-			hd[i+5*drive].start_sect = p->start_sect;
-			hd[i+5*drive].nr_sects = p->nr_sects;
+
+		/* partition table is at 0x1be of first block */
+		p = 0x1be + (void *)bh->b_data;
+		for (i = 1; i < 5; i++, p++) {
+			hd[i + 5 * drive].start_sect = p->start_sect;
+			hd[i + 5 * drive].nr_sects = p->nr_sects;
 		}
+
 		brelse(bh);
 	}
+	
 	if (NR_HD)
-		printk("Partition table%s ok.\n\r",(NR_HD>1)?"s":"");
+		printk("Partition table%s ok.\n",(NR_HD > 1) ? "s" : "");
+
 	rd_load();
+
+	printk("mounting root filesystem...\n");
 	mount_root();
-	return (0);
+
+	return 0;
 }
 
 static int controller_ready(void)

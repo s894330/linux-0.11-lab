@@ -27,3 +27,14 @@ __asm__ volatile( \
 	: "=a" (_v): "d" (port)); \
 _v; \
 })
+
+/*
+ * Yeah, yeah, it's ugly, but I cannot find how to do this correctly
+ * and this seems to work. I anybody has more info on the real-time
+ * clock I'd be interested. Most of this was trial and error, and some
+ * bios-listing reading. Urghh.
+ */
+#define CMOS_READ(addr) ({ \
+	outb_p(0x80 | addr, 0x70); \
+	inb_p(0x71); \
+})

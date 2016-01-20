@@ -66,17 +66,6 @@ extern long startup_time;
 #define DRIVE_INFO (*(struct drive_info *)0x90080)
 #define ORIG_ROOT_DEV (*(unsigned short *)0x901fc)
 
-/*
- * Yeah, yeah, it's ugly, but I cannot find how to do this correctly
- * and this seems to work. I anybody has more info on the real-time
- * clock I'd be interested. Most of this was trial and error, and some
- * bios-listing reading. Urghh.
- */
-#define CMOS_READ(addr) ({ \
-	outb_p(0x80 | addr, 0x70); \
-	inb_p(0x71); \
-})
-
 /* data stored in CMOS is BCD codec 
  * using 1byte: high 4bit value a = a*10
  *		low 4bit value b = b
@@ -195,9 +184,9 @@ static char * envp[] = { "HOME=/usr/root", NULL };
 
 void init(void)
 {
-	int pid,i;
+	int pid, i;
 
-	setup((void *) &drive_info);
+	setup((void *)&drive_info);
 	(void) open("/dev/tty0",O_RDWR,0);
 	(void) dup(0);
 	(void) dup(0);

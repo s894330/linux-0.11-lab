@@ -98,8 +98,8 @@ struct m_inode {
 	unsigned char i_gid;
 	unsigned char i_nlinks;
 	unsigned short i_zone[9];
-/* these are in memory also */
-	struct task_struct * i_wait;
+	/* these are in memory also */
+	struct task_struct *i_wait;
 	unsigned long i_atime;
 	unsigned long i_ctime;
 	unsigned short i_dev;
@@ -130,14 +130,14 @@ struct super_block {
 	unsigned short s_log_zone_size;
 	unsigned long s_max_size;
 	unsigned short s_magic;
-/* These are only in memory */
-	struct buffer_head * s_imap[8];
-	struct buffer_head * s_zmap[8];
+	/* These are only in memory */
+	struct buffer_head *s_imap[8];
+	struct buffer_head *s_zmap[8];
 	unsigned short s_dev;
-	struct m_inode * s_isup;
-	struct m_inode * s_imount;
+	struct m_inode *s_isup;
+	struct m_inode *s_imount;
 	unsigned long s_time;
-	struct task_struct * s_wait;
+	struct task_struct *s_wait;
 	unsigned char s_lock;
 	unsigned char s_rd_only;
 	unsigned char s_dirt;

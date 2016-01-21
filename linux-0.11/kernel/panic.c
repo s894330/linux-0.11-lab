@@ -17,10 +17,12 @@ void sys_sync(void);	/* it's really int */
 
 void panic(const char * s)
 {
-	printk("Kernel panic: %s\n\r",s);
+	printk("Kernel panic: %s\n", s);
+
 	if (current == task[0])
-		printk("In swapper task - not syncing\n\r");
+		printk("In swapper task - not syncing\n");
 	else
 		sys_sync();
+
 	for(;;);
 }

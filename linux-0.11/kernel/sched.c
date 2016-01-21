@@ -157,14 +157,18 @@ void sleep_on(struct task_struct **p)
 
 	if (!p)
 		return;
+
 	if (current == &(init_task.task))
 		panic("task[0] trying to sleep");
-	tmp = *p;
+
+	tmp = *p;   /* save previous waiting process */
 	*p = current;
 	current->state = TASK_UNINTERRUPTIBLE;
 	schedule();
+	*p = tmp;   /* when waked up, restore previous waiting process */
+
 	if (tmp)
-		tmp->state=0;
+		tmp->state = TASK_RUNNING;
 }
 
 void interruptible_sleep_on(struct task_struct **p)
@@ -173,26 +177,31 @@ void interruptible_sleep_on(struct task_struct **p)
 
 	if (!p)
 		return;
+
 	if (current == &(init_task.task))
 		panic("task[0] trying to sleep");
-	tmp=*p;
-	*p=current;
+
+	tmp = *p;
+	*p = current;
 repeat:	current->state = TASK_INTERRUPTIBLE;
 	schedule();
+
 	if (*p && *p != current) {
-		(**p).state=0;
+		(*p)->state = TASK_RUNNING;
 		goto repeat;
 	}
-	*p=NULL;
+
+	*p = tmp;
 	if (tmp)
-		tmp->state=0;
+		tmp->state = TASK_RUNNING;
 }
 
 void wake_up(struct task_struct **p)
 {
 	if (p && *p) {
-		(**p).state=0;
-		*p=NULL;
+		/* wake up the last process which call sleep_on() */
+		(*p)->state = TASK_RUNNING;
+		*p = NULL;
 	}
 }
 

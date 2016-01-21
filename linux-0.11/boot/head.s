@@ -121,7 +121,7 @@ setup_gdt:
 
 /*
  * I put the kernel page tables right after the page directory,
- * using 4 of them to span 16 Mb of physical memory. People with
+ * using 4 of them to span 16 MB of physical memory. People with
  * more than 16MB will have to expand this.
  */
 .org 0x1000
@@ -191,22 +191,22 @@ ignore_int:
  * This routine sets up paging by setting the page bit
  * in cr0. The page tables are set up, identity-mapping
  * the first 16MB. The pager assumes that no illegal
- * addresses are produced (ie >4Mb on a 4Mb machine).
+ * addresses are produced (ie > 4MB on a 4MB machine).
  *
  * NOTE! Although all physical memory should be identity
  * mapped by this routine, only the kernel page functions
- * use the >1Mb addresses directly. All "normal" functions
- * use just the lower 1Mb, or the local data space, which
+ * use the > 1MB addresses directly. All "normal" functions
+ * use just the lower 1MB, or the local data space, which
  * will be mapped to some other place - mm keeps track of
  * that.
  *
- * For those with more memory than 16 Mb - tough luck. I've
+ * For those with more memory than 16 MB - tough luck. I've
  * not got it, why should you :-) The source is here. Change
  * it. (Seriously - it shouldn't be too difficult. Mostly
- * change some constants etc. I left it at 16Mb, as my machine
+ * change some constants etc. I left it at 16MB, as my machine
  * even cannot be extended past that (ok, but it was cheap :-)
  * I've tried to show which constants to change by having
- * some kind of marker at them (search for "16Mb"), but I
+ * some kind of marker at them (search for "16MB"), but I
  * won't guarantee that's all :-( )
  */
 .align 4
@@ -218,7 +218,7 @@ setup_paging:
 	rep
 		stosl
 /* 
- * Format of page dir and page:
+ * Format of page dir entry and page table entry:
  * 31 ............ 12 11~9 8 7 6 5 4 3 2 1 0
  *   page fram addr    AVL 0 0 D A 0 0 U R P
  *                                     / /
@@ -229,6 +229,11 @@ setup_paging:
  *  A: accessd
  *  D: dirty, when CPU exec write command at this page, will set D to 1
  * */
+	/* 
+	 * set kernel code to user (bit2 set to 1) is because task 0 and
+	 * task 1's code is also inside the kernel code, so we need to let these
+	 * two user space process can access memory
+	 */
 	/* $pg0 + 7 = 0x00001007, $pg1 + 7 = 0x00002007, and so on */
 	movl 	$pg0 + 7, pg_dir	/* set present bit/user r/w */
 	movl 	$pg1 + 7, pg_dir + 4	/*  --------- " " --------- */

@@ -32,7 +32,7 @@ void do_exit(long code);
 
 static inline void oom(void)
 {
-	printk("out of memory\n\r");
+	printk("out of memory\n");
 	do_exit(SIGSEGV);
 }
 
@@ -51,8 +51,8 @@ __asm__("movl %%eax, %%cr3"::"a" (0))
 
 static long HIGH_MEMORY = 0;
 
-#define copy_page(from,to) \
-__asm__("cld; rep; movsl"::"S" (from), "D" (to), "c" (1024))
+#define copy_page(from, to) \
+	__asm__("cld; rep; movsl"::"S" (from), "D" (to), "c" (1024))
 
 static unsigned char mem_map[PAGING_PAGES] = {0};
 
@@ -69,10 +69,11 @@ unsigned long get_free_page(void)
 	 */
 	register unsigned long __res;
 
+	/* get first unused page in mem_map[] and clean it, then return */
 	__asm__("std; repne; scasb\n\t"	    /* repeat compare es:edi with al */
 		"jne 1f\n\t"
 		"movb $1, 1(%%edi)\n\t"	    /* set mem_map[edi+1] to 1 */
-		"sall $12, %%ecx\n\t"	    /* shift left 12 bit of ecx value */
+		"sall $12, %%ecx\n\t"	    /* shift left, ecx * 4KB */
 		"addl %2, %%ecx\n\t"	    /* add memory base (LOW_MEM) */
 		"movl %%ecx, %%edx\n\t"	    /* edx = real physical mem addr */
 		"movl $1024, %%ecx\n\t"
@@ -256,23 +257,27 @@ unsigned long put_page(unsigned long page,unsigned long address)
 	return page;
 }
 
-void un_wp_page(unsigned long * table_entry)
+void un_wp_page(unsigned long *table_entry)
 {
-	unsigned long old_page,new_page;
+	unsigned long old_page, new_page;
 
+	/* if page is not shared (mem_map[] = 1), change property to R/W */
 	old_page = 0xfffff000 & *table_entry;
-	if (old_page >= LOW_MEM && mem_map[MAP_NR(old_page)]==1) {
+	if (old_page >= LOW_MEM && mem_map[MAP_NR(old_page)] == 1) {
 		*table_entry |= 2;
 		invalidate();
 		return;
 	}
-	if (!(new_page=get_free_page()))
+
+	if (!(new_page = get_free_page()))
 		oom();
+
 	if (old_page >= LOW_MEM)
 		mem_map[MAP_NR(old_page)]--;
+
 	*table_entry = new_page | 7;
 	invalidate();
-	copy_page(old_page,new_page);
+	copy_page(old_page, new_page);
 }	
 
 /*
@@ -282,7 +287,7 @@ void un_wp_page(unsigned long * table_entry)
  *
  * If it's in code space we exit with a segment error.
  */
-void do_wp_page(unsigned long error_code,unsigned long address)
+void do_wp_page(unsigned long error_code, unsigned long address)
 {
 #if 0
 /* we cannot do this yet: the estdio library writes to code space */
@@ -290,10 +295,14 @@ void do_wp_page(unsigned long error_code,unsigned long address)
 	if (CODE_SPACE(address))
 		do_exit(SIGSEGV);
 #endif
-	un_wp_page((unsigned long *)
-		(((address>>10) & 0xffc) + (0xfffff000 &
-		*((unsigned long *) ((address>>20) &0xffc)))));
+	unsigned long pgt_addr, pgt_entry_offset;
 
+	pgt_addr = *((unsigned long *)(((address >> 22) & 0x3ff) * 4));
+	pgt_addr &= 0xfffff000;
+
+	pgt_entry_offset = ((address >> 12) & 0x3ff) * 4;
+
+	un_wp_page((unsigned long *)(pgt_addr + pgt_entry_offset));
 }
 
 void write_verify(unsigned long address)
@@ -453,7 +462,8 @@ void mem_init(long start_mem, long end_mem)
 	end_mem -= start_mem;
 	end_mem >>= 12;
 
-	while (end_mem-->0)
+	/* according phsical memory size to adjust mem_map[] */
+	while (end_mem-- > 0)
 		mem_map[i++] = 0;
 }
 

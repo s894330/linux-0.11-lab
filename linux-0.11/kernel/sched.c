@@ -113,7 +113,7 @@ void schedule(void)
 	 * check alarm, wake up any interruptible tasks that have got a 
 	 * signal
 	 */
-	for(p = &LAST_TASK; p > &FIRST_TASK; --p)
+	for(p = &LAST_TASK; p > &FIRST_TASK; --p) {
 		if (*p) {
 			if ((*p)->alarm && (*p)->alarm < jiffies) {
 				(*p)->signal |= (1 << (SIGALRM - 1));
@@ -121,29 +121,42 @@ void schedule(void)
 			}
 
 			if (((*p)->signal & (_BLOCKABLE & ~(*p)->blocked)) &&
-				(*p)->state==TASK_INTERRUPTIBLE)
-				(*p)->state=TASK_RUNNING;
+				(*p)->state == TASK_INTERRUPTIBLE)
+				(*p)->state = TASK_RUNNING;
 		}
+	}
 
-/* this is the scheduler proper: */
-
+	/* this is the scheduler proper: */
 	while (1) {
 		c = -1;
 		next = 0;
 		i = NR_TASKS;
 		p = &task[NR_TASKS];
+
 		while (--i) {
 			if (!*--p)
 				continue;
-			if ((*p)->state == TASK_RUNNING && (*p)->counter > c)
-				c = (*p)->counter, next = i;
+
+			/* find the task which has max counter */
+			if ((*p)->state == TASK_RUNNING && (*p)->counter > c) {
+				c = (*p)->counter;
+				next = i;
+			}
 		}
-		if (c) break;
-		for(p = &LAST_TASK ; p > &FIRST_TASK ; --p)
+
+		if (c) 
+			break;
+
+		/* 
+		 * now c = 0, means every task's counter is 0, need re-allocate
+		 * all task's counter
+		 */
+		for (p = &LAST_TASK; p > &FIRST_TASK; --p)
 			if (*p)
-				(*p)->counter = ((*p)->counter >> 1) +
-						(*p)->priority;
+				(*p)->counter = ((*p)->counter >> 1) + 
+					(*p)->priority;
 	}
+
 	switch_to(next);
 }
 

@@ -5,7 +5,7 @@
 #define HZ 100
 
 #define FIRST_TASK task[0]
-#define LAST_TASK task[NR_TASKS-1]
+#define LAST_TASK task[NR_TASKS - 1]
 
 #include <linux/head.h>
 #include <linux/fs.h>
@@ -236,6 +236,11 @@ __asm__("str %%ax\n\t" \
  * tha math co-processor latest.
  */
 #define switch_to(n) { \
+/* 
+ * __tmp is used for "ljmp" which need 4 byte offset(long a) and 2 byte
+ * selector (low 2 byte of long b), when "ljmp" to new task, the offset (long a)
+ * is not used, just selector is used
+ */ \
 struct {long a, b;} __tmp; \
 __asm__("cmpl %%ecx, current\n\t" \
 	"je 1f\n\t" \

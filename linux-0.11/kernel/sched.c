@@ -20,7 +20,7 @@
 
 #include <signal.h>
 
-#define _S(nr) (1<<((nr)-1))
+#define _S(nr) (1 << ((nr) - 1))
 #define _BLOCKABLE (~(_S(SIGKILL) | _S(SIGSTOP)))
 
 void show_task(int nr,struct task_struct * p)
@@ -106,19 +106,22 @@ void math_state_restore()
  */
 void schedule(void)
 {
-	int i,next,c;
-	struct task_struct ** p;
+	int i, next, c;
+	struct task_struct **p;
 
-/* check alarm, wake up any interruptible tasks that have got a signal */
-
-	for(p = &LAST_TASK ; p > &FIRST_TASK ; --p)
+	/* 
+	 * check alarm, wake up any interruptible tasks that have got a 
+	 * signal
+	 */
+	for(p = &LAST_TASK; p > &FIRST_TASK; --p)
 		if (*p) {
 			if ((*p)->alarm && (*p)->alarm < jiffies) {
-					(*p)->signal |= (1<<(SIGALRM-1));
-					(*p)->alarm = 0;
-				}
-			if (((*p)->signal & ~(_BLOCKABLE & (*p)->blocked)) &&
-			(*p)->state==TASK_INTERRUPTIBLE)
+				(*p)->signal |= (1 << (SIGALRM - 1));
+				(*p)->alarm = 0;
+			}
+
+			if (((*p)->signal & (_BLOCKABLE & ~(*p)->blocked)) &&
+				(*p)->state==TASK_INTERRUPTIBLE)
 				(*p)->state=TASK_RUNNING;
 		}
 
@@ -148,6 +151,7 @@ int sys_pause(void)
 {
 	current->state = TASK_INTERRUPTIBLE;
 	schedule();
+
 	return 0;
 }
 

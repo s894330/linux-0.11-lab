@@ -48,15 +48,16 @@ static inline void wait_on_buffer(struct buffer_head *bh)
 int sys_sync(void)
 {
 	int i;
-	struct buffer_head * bh;
+	struct buffer_head *bh;
 
 	sync_inodes();		/* write out inodes into buffers */
 	bh = start_buffer;
-	for (i=0 ; i<NR_BUFFERS ; i++,bh++) {
+	for (i = 0; i < NR_BUFFERS; i++, bh++) {
 		wait_on_buffer(bh);
 		if (bh->b_dirt)
-			ll_rw_block(WRITE,bh);
+			ll_rw_block(WRITE, bh);
 	}
+
 	return 0;
 }
 
@@ -93,10 +94,10 @@ int sync_dev(int dev)
 void inline invalidate_buffers(int dev)
 {
 	int i;
-	struct buffer_head * bh;
+	struct buffer_head *bh;
 
 	bh = start_buffer;
-	for (i=0 ; i<NR_BUFFERS ; i++,bh++) {
+	for (i = 0; i < NR_BUFFERS; i++, bh++) {
 		if (bh->b_dev != dev)
 			continue;
 		wait_on_buffer(bh);
@@ -138,38 +139,40 @@ void check_disk_change(int dev)
 #define _hashfn(dev, block) (((unsigned)(dev ^ block)) % NR_HASH)
 #define hash(dev, block) hash_table[_hashfn(dev, block)]
 
-static inline void remove_from_queues(struct buffer_head * bh)
+static inline void remove_from_queues(struct buffer_head *bh)
 {
-/* remove from hash-queue */
+	/* remove from hash-queue */
 	if (bh->b_next)
 		bh->b_next->b_prev = bh->b_prev;
 	if (bh->b_prev)
 		bh->b_prev->b_next = bh->b_next;
-	if (hash(bh->b_dev,bh->b_blocknr) == bh)
-		hash(bh->b_dev,bh->b_blocknr) = bh->b_next;
-/* remove from free list */
+	if (hash(bh->b_dev, bh->b_blocknr) == bh)
+		hash(bh->b_dev, bh->b_blocknr) = bh->b_next;
+
+	/* remove from free list */
 	if (!(bh->b_prev_free) || !(bh->b_next_free))
 		panic("Free block list corrupted");
-	bh->b_prev_free->b_next_free = bh->b_next_free;
 	bh->b_next_free->b_prev_free = bh->b_prev_free;
+	bh->b_prev_free->b_next_free = bh->b_next_free;
 	if (free_list == bh)
 		free_list = bh->b_next_free;
 }
 
-static inline void insert_into_queues(struct buffer_head * bh)
+static inline void insert_into_queues(struct buffer_head *bh)
 {
-/* put at end of free list */
+	/* put at end of free list */
 	bh->b_next_free = free_list;
 	bh->b_prev_free = free_list->b_prev_free;
 	free_list->b_prev_free->b_next_free = bh;
 	free_list->b_prev_free = bh;
-/* put the buffer in new hash-queue if it has a device */
+
+	/* put the buffer in new hash-queue if it has a device */
 	bh->b_prev = NULL;
 	bh->b_next = NULL;
 	if (!bh->b_dev)
 		return;
-	bh->b_next = hash(bh->b_dev,bh->b_blocknr);
-	hash(bh->b_dev,bh->b_blocknr) = bh;
+	bh->b_next = hash(bh->b_dev, bh->b_blocknr);
+	hash(bh->b_dev, bh->b_blocknr) = bh;
 	bh->b_next->b_prev = bh;
 }
 
@@ -258,23 +261,29 @@ repeat:
 			goto repeat;
 	}
 
-/* NOTE!! While we slept waiting for this block, somebody else might */
-/* already have added "this" block to the cache. check it */
-	if (find_buffer(dev,block))
+	/* 
+	 * NOTE!! While we slept waiting for this block, somebody else might
+	 * already have added "this" block to the cache. check it
+	 */
+	if (find_buffer(dev, block))
 		goto repeat;
-/* OK, FINALLY we know that this buffer is the only one of it's kind, */
-/* and that it's unused (b_count=0), unlocked (b_lock=0), and clean */
-	bh->b_count=1;
-	bh->b_dirt=0;
-	bh->b_uptodate=0;
+
+	/* 
+	 * OK, FINALLY we know that this buffer is the only one of it's kind,
+	 * and that it's unused (b_count=0), unlocked (b_lock=0), and clean
+	 */
+	bh->b_count = 1;
+	bh->b_dirt = 0;
+	bh->b_uptodate = 0;
 	remove_from_queues(bh);
-	bh->b_dev=dev;
-	bh->b_blocknr=block;
+	bh->b_dev = dev;
+	bh->b_blocknr = block;
 	insert_into_queues(bh);
+
 	return bh;
 }
 
-void brelse(struct buffer_head * buf)
+void brelse(struct buffer_head *buf)
 {
 	if (!buf)
 		return;
@@ -309,7 +318,7 @@ struct buffer_head *bread(int dev, int block)
 	return NULL;
 }
 
-#define COPYBLK(from,to) \
+#define COPYBLK(from, to) \
 __asm__("cld\n\t" \
 	"rep\n\t" \
 	"movsl" \
@@ -321,25 +330,29 @@ __asm__("cld\n\t" \
  * all at the same time, not waiting for one to be read, and then another
  * etc.
  */
-void bread_page(unsigned long address,int dev,int b[4])
+void bread_page(unsigned long address, int dev, int b[4])
 {
-	struct buffer_head * bh[4];
+	struct buffer_head *bh[4];
 	int i;
 
-	for (i=0 ; i<4 ; i++)
+	for (i = 0; i < 4; i++) {
 		if (b[i]) {
-			if ((bh[i] = getblk(dev,b[i])))
+			if ((bh[i] = getblk(dev, b[i])))
 				if (!bh[i]->b_uptodate)
-					ll_rw_block(READ,bh[i]);
-		} else
+					ll_rw_block(READ, bh[i]);
+		} else {
 			bh[i] = NULL;
-	for (i=0 ; i<4 ; i++,address += BLOCK_SIZE)
+		}
+	}
+
+	for (i = 0; i < 4; i++, address += BLOCK_SIZE) {
 		if (bh[i]) {
 			wait_on_buffer(bh[i]);
 			if (bh[i]->b_uptodate)
-				COPYBLK((unsigned long) bh[i]->b_data,address);
+				COPYBLK((unsigned long)bh[i]->b_data, address);
 			brelse(bh[i]);
 		}
+	}
 }
 
 /*
@@ -347,30 +360,35 @@ void bread_page(unsigned long address,int dev,int b[4])
  * blocks for reading as well. End the argument list with a negative
  * number.
  */
-struct buffer_head * breada(int dev,int first, ...)
+struct buffer_head *breada(int dev, int first, ...)
 {
 	va_list args;
-	struct buffer_head * bh, *tmp;
+	struct buffer_head *bh, *tmp;
 
-	va_start(args,first);
-	if (!(bh=getblk(dev,first)))
+	va_start(args, first);
+	if (!(bh = getblk(dev, first)))
 		panic("bread: getblk returned NULL\n");
 	if (!bh->b_uptodate)
-		ll_rw_block(READ,bh);
-	while ((first=va_arg(args,int))>=0) {
-		tmp=getblk(dev,first);
+		ll_rw_block(READ, bh);
+
+	while ((first = va_arg(args, int)) >=0 ) {
+		tmp = getblk(dev, first);
 		if (tmp) {
 			if (!tmp->b_uptodate)
-				ll_rw_block(READA,bh);
+				ll_rw_block(READA, tmp);
+
+			/* just pre-read, not used, so count -1 */
 			tmp->b_count--;
 		}
 	}
+
 	va_end(args);
 	wait_on_buffer(bh);
 	if (bh->b_uptodate)
 		return bh;
+
 	brelse(bh);
-	return (NULL);
+	return NULL;
 }
 
 void buffer_init(long buffer_end)

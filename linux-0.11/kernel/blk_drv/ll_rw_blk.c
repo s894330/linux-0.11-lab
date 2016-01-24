@@ -142,16 +142,17 @@ repeat:
 	add_request(major+blk_dev,req);
 }
 
-void ll_rw_block(int rw, struct buffer_head * bh)
+void ll_rw_block(int rw, struct buffer_head *bh)
 {
 	unsigned int major;
 
-	if ((major=MAJOR(bh->b_dev)) >= NR_BLK_DEV ||
-	!(blk_dev[major].request_fn)) {
-		printk("Trying to read nonexistent block-device\n\r");
+	if ((major = MAJOR(bh->b_dev)) >= NR_BLK_DEV ||
+		!(blk_dev[major].request_fn)) {
+		printk("Trying to read nonexistent block-device\n");
 		return;
 	}
-	make_request(major,rw,bh);
+
+	make_request(major, rw, bh);
 }
 
 void blk_dev_init(void)

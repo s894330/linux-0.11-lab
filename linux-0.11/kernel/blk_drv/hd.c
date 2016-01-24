@@ -68,7 +68,7 @@ static int NR_HD = 0;
 static struct hd_struct {
 	long start_sect;
 	long nr_sects;
-} hd[5 * MAX_HD]={{0, 0},};
+} hd[5 * MAX_HD] = {{0, 0}};
 
 #define port_read(port, buf, nr) \
 __asm__("cld; rep; insw"::"d" (port), "D" (buf), "c" (nr))
@@ -110,6 +110,7 @@ int sys_setup(void * BIOS)
 	else
 		NR_HD = 1;
 #endif
+	/* calculate hard disk total sectors */
 	for (i = 0; i < NR_HD; i++) {
 		hd[i * 5].start_sect = 0;
 		hd[i * 5].nr_sects = 
@@ -169,6 +170,8 @@ int sys_setup(void * BIOS)
 
 		/* partition table is at 0x1be of first block */
 		p = 0x1be + (void *)bh->b_data;
+
+		/* calculate each partition's total sectors */
 		for (i = 1; i < 5; i++, p++) {
 			hd[i + 5 * drive].start_sect = p->start_sect;
 			hd[i + 5 * drive].nr_sects = p->nr_sects;
@@ -178,11 +181,11 @@ int sys_setup(void * BIOS)
 	}
 	
 	if (NR_HD)
-		printk("Partition table%s ok.\n",(NR_HD > 1) ? "s" : "");
+		printk("Read partition table%s ok.\n", (NR_HD > 1) ? "s" : "");
 
 	rd_load();
 
-	printk("mounting root filesystem...\n");
+	printk("Mounting root filesystem...\n");
 	mount_root();
 
 	return 0;

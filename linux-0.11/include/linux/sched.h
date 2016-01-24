@@ -118,7 +118,7 @@ struct task_struct {
     .counter = 15, \
     .priority = 15, \
     .signal = 0, \
-    .sigaction = {{},}, \
+    .sigaction = {{}}, \
     .blocked = 0, \
     .exit_code = 0, \
     .start_code = 0, \
@@ -150,7 +150,7 @@ struct task_struct {
     .root = NULL, \
     .executable = NULL, \
     .close_on_exec = 0, \
-    .filp = {NULL,}, \
+    .filp = {NULL}, \
     .ldt = { \
 	    {0, 0}, \
 	    /* len limit, property */ \

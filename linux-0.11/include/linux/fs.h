@@ -38,7 +38,7 @@ void buffer_init(long buffer_end);
 
 #define I_MAP_SLOTS 8
 #define Z_MAP_SLOTS 8
-#define SUPER_MAGIC 0x137F
+#define SUPER_MAGIC 0x137f
 
 #define NR_OPEN 20
 #define NR_INODE 32
@@ -117,7 +117,7 @@ struct file {
 	unsigned short f_mode;
 	unsigned short f_flags;
 	unsigned short f_count;
-	struct m_inode * f_inode;
+	struct m_inode *f_inode;
 	off_t f_pos;
 };
 
@@ -131,8 +131,8 @@ struct super_block {
 	unsigned long s_max_size;
 	unsigned short s_magic;
 	/* These are only in memory */
-	struct buffer_head *s_imap[8];
-	struct buffer_head *s_zmap[8];
+	struct buffer_head *s_imap[I_MAP_SLOTS];
+	struct buffer_head *s_zmap[Z_MAP_SLOTS];
 	unsigned short s_dev;
 	struct m_inode *s_isup;
 	struct m_inode *s_imount;

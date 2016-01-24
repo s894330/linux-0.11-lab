@@ -37,7 +37,7 @@ static struct buffer_head *free_list;
 static struct task_struct *buffer_wait = NULL;
 int NR_BUFFERS = 0;
 
-static inline void wait_on_buffer(struct buffer_head * bh)
+static inline void wait_on_buffer(struct buffer_head *bh)
 {
 	cli();
 	while (bh->b_lock)
@@ -63,25 +63,30 @@ int sys_sync(void)
 int sync_dev(int dev)
 {
 	int i;
-	struct buffer_head * bh;
+	struct buffer_head *bh;
 
 	bh = start_buffer;
-	for (i=0 ; i<NR_BUFFERS ; i++,bh++) {
+	for (i = 0; i < NR_BUFFERS; i++, bh++) {
 		if (bh->b_dev != dev)
 			continue;
 		wait_on_buffer(bh);
 		if (bh->b_dev == dev && bh->b_dirt)
-			ll_rw_block(WRITE,bh);
+			ll_rw_block(WRITE, bh);
 	}
+
+	/* write inode data into buffer_headd */
 	sync_inodes();
+
+	/* sync again */
 	bh = start_buffer;
-	for (i=0 ; i<NR_BUFFERS ; i++,bh++) {
+	for (i = 0; i < NR_BUFFERS; i++, bh++) {
 		if (bh->b_dev != dev)
 			continue;
 		wait_on_buffer(bh);
 		if (bh->b_dev == dev && bh->b_dirt)
-			ll_rw_block(WRITE,bh);
+			ll_rw_block(WRITE, bh);
 	}
+
 	return 0;
 }
 
@@ -129,8 +134,9 @@ void check_disk_change(int dev)
 	invalidate_buffers(dev);
 }
 
-#define _hashfn(dev,block) (((unsigned)(dev^block))%NR_HASH)
-#define hash(dev,block) hash_table[_hashfn(dev,block)]
+/* "^": exclusive or */
+#define _hashfn(dev, block) (((unsigned)(dev ^ block)) % NR_HASH)
+#define hash(dev, block) hash_table[_hashfn(dev, block)]
 
 static inline void remove_from_queues(struct buffer_head * bh)
 {
@@ -167,13 +173,14 @@ static inline void insert_into_queues(struct buffer_head * bh)
 	bh->b_next->b_prev = bh;
 }
 
-static struct buffer_head * find_buffer(int dev, int block)
+static struct buffer_head *find_buffer(int dev, int block)
 {		
-	struct buffer_head * tmp;
+	struct buffer_head *tmp;
 
-	for (tmp = hash(dev,block) ; tmp != NULL ; tmp = tmp->b_next)
-		if (tmp->b_dev==dev && tmp->b_blocknr==block)
+	for (tmp = hash(dev, block); tmp != NULL; tmp = tmp->b_next)
+		if (tmp->b_dev == dev && tmp->b_blocknr == block)
 			return tmp;
+
 	return NULL;
 }
 
@@ -184,17 +191,23 @@ static struct buffer_head * find_buffer(int dev, int block)
  * will force it bad). This shouldn't really happen currently, but
  * the code is ready.
  */
-struct buffer_head * get_hash_table(int dev, int block)
+struct buffer_head *get_hash_table(int dev, int block)
 {
-	struct buffer_head * bh;
+	struct buffer_head *bh;
 
 	for (;;) {
-		if (!(bh=find_buffer(dev,block)))
+		if (!(bh = find_buffer(dev, block)))
 			return NULL;
+
 		bh->b_count++;
 		wait_on_buffer(bh);
 		if (bh->b_dev == dev && bh->b_blocknr == block)
 			return bh;
+
+		/* 
+		 * if bh has been changed during wait_on_buffer(), delete
+		 * reference count and loop check again
+		 */
 		bh->b_count--;
 	}
 }
@@ -206,38 +219,45 @@ struct buffer_head * get_hash_table(int dev, int block)
  *
  * The algoritm is changed: hopefully better, and an elusive bug removed.
  */
-#define BADNESS(bh) (((bh)->b_dirt<<1)+(bh)->b_lock)
-struct buffer_head * getblk(int dev,int block)
+#define BADNESS(bh) (((bh)->b_dirt << 1) + (bh)->b_lock)
+struct buffer_head *getblk(int dev, int block)
 {
-	struct buffer_head * tmp, * bh;
+	struct buffer_head *tmp, *bh;
 
 repeat:
-	if ((bh = get_hash_table(dev,block)))
+	if ((bh = get_hash_table(dev, block)))
 		return bh;
+
 	tmp = free_list;
 	do {
 		if (tmp->b_count)
 			continue;
-		if (!bh || BADNESS(tmp)<BADNESS(bh)) {
+
+		if (!bh || BADNESS(tmp) < BADNESS(bh)) {
 			bh = tmp;
-			if (!BADNESS(tmp))
+			if (!BADNESS(tmp))  /* found the clean one, bread */
 				break;
 		}
-/* and repeat until we find something good */
+	/* and repeat until we find something good */
 	} while ((tmp = tmp->b_next_free) != free_list);
+
 	if (!bh) {
 		sleep_on(&buffer_wait);
 		goto repeat;
 	}
+
 	wait_on_buffer(bh);
+	/* if bh is used by other process during wait_on_buffer(), loop again */
 	if (bh->b_count)
 		goto repeat;
+
 	while (bh->b_dirt) {
 		sync_dev(bh->b_dev);
 		wait_on_buffer(bh);
 		if (bh->b_count)
 			goto repeat;
 	}
+
 /* NOTE!! While we slept waiting for this block, somebody else might */
 /* already have added "this" block to the cache. check it */
 	if (find_buffer(dev,block))
@@ -268,19 +288,24 @@ void brelse(struct buffer_head * buf)
  * bread() reads a specified block and returns the buffer that contains
  * it. It returns NULL if the block was unreadable.
  */
-struct buffer_head * bread(int dev,int block)
+struct buffer_head *bread(int dev, int block)
 {
-	struct buffer_head * bh;
+	struct buffer_head *bh;
 
-	if (!(bh=getblk(dev,block)))
+	if (!(bh = getblk(dev, block)))
 		panic("bread: getblk returned NULL\n");
+
 	if (bh->b_uptodate)
 		return bh;
-	ll_rw_block(READ,bh);
+
+	ll_rw_block(READ, bh);
 	wait_on_buffer(bh);
+
 	if (bh->b_uptodate)
 		return bh;
+
 	brelse(bh);
+
 	return NULL;
 }
 

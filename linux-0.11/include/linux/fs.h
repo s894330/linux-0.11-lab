@@ -30,8 +30,8 @@
 
 void buffer_init(long buffer_end);
 
-#define MAJOR(a) (((unsigned)(a))>>8)
-#define MINOR(a) ((a)&0xff)
+#define MAJOR(a) (((unsigned)(a)) >> 8)
+#define MINOR(a) ((a) & 0xff)
 
 #define NAME_LEN 14
 #define ROOT_INO 1

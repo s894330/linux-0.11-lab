@@ -12,20 +12,26 @@ CFLAGS	+= -I../../include
 CPP	+= -I../../include
 
 .c.s:
-	@$(CC) $(CFLAGS) \
-	-S -o $*.s $<
+	@$(CC) $(CFLAGS) -S -o $*.s $<
 .s.o:
 	@$(AS) -o $*.o $<
 .c.o:
-	@$(CC) $(CFLAGS) \
-	-c -o $*.o $<
+	@$(CC) $(CFLAGS) -c -o $*.o $<
 
 OBJS  = ll_rw_blk.o floppy.o hd.o ramdisk.o
 
+# options for ar
+#   r: Insert the files into archive, any previously existing members will be
+#      deleted
+#   c: Create the archive
+#   s: Add an index to the archive, or update it if it already exists (this can
+#      speed up creation time when create big archive)
 blk_drv.a: $(OBJS)
 	@$(AR) rcs blk_drv.a $(OBJS)
 	@sync
 
+# options for rm
+#   -f: ignore nonexistent files and arguments, never prompt
 clean:
 	@rm -f core *.o *.a tmp_make
 	@for i in *.c;do rm -f `basename $$i .c`.s;done

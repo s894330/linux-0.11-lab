@@ -24,7 +24,7 @@ struct request {
 	int dev;		/* -1 if no request */
 	int cmd;		/* READ or WRITE */
 	int errors;
-	unsigned long sector;
+	unsigned long sector;	/* sector number start to read */
 	unsigned long nr_sectors;
 	char *buffer;
 	struct task_struct *waiting;
@@ -37,10 +37,13 @@ struct request {
  * reads always go before writes. This is natural: reads
  * are much more time-critical than writes.
  */
-#define IN_ORDER(s1,s2) \
-((s1)->cmd<(s2)->cmd || ((s1)->cmd==(s2)->cmd && \
-((s1)->dev < (s2)->dev || ((s1)->dev == (s2)->dev && \
-(s1)->sector < (s2)->sector))))
+/* check which is first than the other */
+#define IN_ORDER(s1, s2) \
+	((s1)->cmd < (s2)->cmd || /* read is first than write */ \
+	 ((s1)->cmd == (s2)->cmd && \
+	  ((s1)->dev < (s2)->dev || /* min dev number is first */ \
+	   /* min start sector number is first*/ \
+	   ((s1)->dev == (s2)->dev && (s1)->sector < (s2)->sector))))
 
 struct blk_dev_struct {
 	void (*request_fn)(void);
@@ -49,7 +52,7 @@ struct blk_dev_struct {
 
 extern struct blk_dev_struct blk_dev[NR_BLK_DEV];
 extern struct request request[NR_REQUEST];
-extern struct task_struct * wait_for_request;
+extern struct task_struct *wait_for_request;
 
 #ifdef MAJOR_NR
 
@@ -80,7 +83,7 @@ extern struct task_struct * wait_for_request;
 #define DEVICE_NAME "harddisk"
 #define DEVICE_INTR do_hd
 #define DEVICE_REQUEST do_hd_request
-#define DEVICE_NR(device) (MINOR(device)/5)
+#define DEVICE_NR(device) (MINOR(device) / 5)
 #define DEVICE_ON(device)
 #define DEVICE_OFF(device)
 
@@ -88,36 +91,44 @@ extern struct task_struct * wait_for_request;
 /* unknown blk device */
 #error "unknown blk device"
 
-#endif
+#endif	/* MAJOR_NR */
 
 #define CURRENT (blk_dev[MAJOR_NR].current_request)
 #define CURRENT_DEV DEVICE_NR(CURRENT->dev)
 
 #ifdef DEVICE_INTR
 void (*DEVICE_INTR)(void) = NULL;
-#endif
+#endif	/* DEVICE_INTR */
 static void (DEVICE_REQUEST)(void);
 
-static inline void unlock_buffer(struct buffer_head * bh)
+/* 
+ * "static inline" means "we have to have this function, if you use it but
+ * don't inline it, then make a static version of it in this compilation unit"
+ */
+static inline void unlock_buffer(struct buffer_head *bh)
 {
 	if (!bh->b_lock)
 		printk(DEVICE_NAME ": free buffer being unlocked\n");
-	bh->b_lock=0;
+
+	bh->b_lock = 0;
 	wake_up(&bh->b_wait);
 }
 
 static inline void end_request(int uptodate)
 {
 	DEVICE_OFF(CURRENT->dev);
+
 	if (CURRENT->bh) {
 		CURRENT->bh->b_uptodate = uptodate;
 		unlock_buffer(CURRENT->bh);
 	}
+
 	if (!uptodate) {
 		printk(DEVICE_NAME " I/O error\n\r");
-		printk("dev %04x, block %d\n\r",CURRENT->dev,
+		printk("dev %04x, block %d\n\r", CURRENT->dev,
 			CURRENT->bh->b_blocknr);
 	}
+
 	wake_up(&CURRENT->waiting);
 	wake_up(&wait_for_request);
 	CURRENT->dev = -1;
@@ -135,6 +146,6 @@ repeat: \
 			panic(DEVICE_NAME ": block not locked"); \
 	}
 
-#endif
+#endif	/* MAJOR_NR */
 
-#endif
+#endif	/* _BLK_H */

@@ -80,14 +80,19 @@ struct buffer_head {
 	struct buffer_head *b_next_free;
 };
 
+/* 32 bytes */
 struct d_inode {
-	unsigned short i_mode;
-	unsigned short i_uid;
-	unsigned long i_size;
-	unsigned long i_time;
-	unsigned char i_gid;
-	unsigned char i_nlinks;
-	unsigned short i_zone[9];
+	unsigned short i_mode;	    /* file type and rwx bit */
+	unsigned short i_uid;	    /* user who owns the file */
+	unsigned long i_size;	    /* nr of bytes in the file */
+	unsigned long i_time;	    /* time of last modified since 1970/1/1 */
+	unsigned char i_gid;	    /* specify owner's group */
+	unsigned char i_nlinks;	    /* hard link nrs */
+	unsigned short i_zone[9];   /* i_zone[0]~i_zone[6] are direct access */
+				    /* i_zone[7] is indirect access */
+				    /* i_zone[8] is double indirect access */
+				    /* for device file(/dev/), zone[0] store */
+				    /* the device nr */
 };
 
 struct m_inode {
@@ -114,11 +119,11 @@ struct m_inode {
 };
 
 struct file {
-	unsigned short f_mode;
-	unsigned short f_flags;
+	unsigned short f_mode;	    /* the same as i_mode in struct d_inode */
+	unsigned short f_flags;	    /* flags used in open() */
 	unsigned short f_count;
-	struct m_inode *f_inode;
-	off_t f_pos;
+	struct m_inode *f_inode;    /* file corresponding inode */
+	off_t f_pos;		    /* current read/write position */
 };
 
 struct super_block {
@@ -143,15 +148,18 @@ struct super_block {
 	unsigned char s_dirt;
 };
 
+/* 
+ * super block struct in disk, in MINIX 1.0 fs, 1 zone = 1 block = 1024KB
+ */
 struct d_super_block {
-	unsigned short s_ninodes;
-	unsigned short s_nzones;
-	unsigned short s_imap_blocks;
-	unsigned short s_zmap_blocks;
-	unsigned short s_firstdatazone;
-	unsigned short s_log_zone_size;
-	unsigned long s_max_size;
-	unsigned short s_magic;
+	unsigned short s_ninodes;	/* inode nrs */
+	unsigned short s_nzones;	/* zone nrs */
+	unsigned short s_imap_blocks;	/* block nrs used by inode bit map */
+	unsigned short s_zmap_blocks;	/* block nrs used by zone bit map */
+	unsigned short s_firstdatazone;	/* first data zone */
+	unsigned short s_log_zone_size;	/* log2(zone size/block size) */
+	unsigned long s_max_size;	/* maximum file size */
+	unsigned short s_magic;		/* file system magic nr */
 };
 
 struct dir_entry {
@@ -182,7 +190,7 @@ extern void iput(struct m_inode * inode);
 extern struct m_inode * iget(int dev,int nr);
 extern struct m_inode * get_empty_inode(void);
 extern struct m_inode * get_pipe_inode(void);
-extern struct buffer_head * get_hash_table(int dev, int block);
+extern struct buffer_head *get_from_hash_table(int dev, int block);
 extern struct buffer_head * getblk(int dev, int block);
 extern void ll_rw_block(int rw, struct buffer_head * bh);
 extern void brelse(struct buffer_head * buf);

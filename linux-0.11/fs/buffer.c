@@ -194,7 +194,7 @@ static struct buffer_head *find_buffer(int dev, int block)
  * will force it bad). This shouldn't really happen currently, but
  * the code is ready.
  */
-struct buffer_head *get_hash_table(int dev, int block)
+struct buffer_head *get_from_hash_table(int dev, int block)
 {
 	struct buffer_head *bh;
 
@@ -228,9 +228,13 @@ struct buffer_head *getblk(int dev, int block)
 	struct buffer_head *tmp, *bh;
 
 repeat:
-	if ((bh = get_hash_table(dev, block)))
+	if ((bh = get_from_hash_table(dev, block)))
 		return bh;
 
+	/* 
+	 * can not get corresponding bh from hash table, begin get it from
+	 * free_list
+	 */
 	tmp = free_list;
 	do {
 		if (tmp->b_count)
@@ -307,6 +311,7 @@ struct buffer_head *bread(int dev, int block)
 	if (bh->b_uptodate)
 		return bh;
 
+	/* read data from hard disk into buffer_head */
 	ll_rw_block(READ, bh);
 	wait_on_buffer(bh);
 
@@ -314,7 +319,6 @@ struct buffer_head *bread(int dev, int block)
 		return bh;
 
 	brelse(bh);
-
 	return NULL;
 }
 

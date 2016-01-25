@@ -126,11 +126,15 @@ void check_disk_change(int dev)
 
 	if (MAJOR(dev) != 2)
 		return;
+
 	if (!floppy_change(dev & 0x03))
 		return;
-	for (i=0 ; i<NR_SUPER ; i++)
+
+	for (i = 0; i < NR_SUPER; i++) {
 		if (super_block[i].s_dev == dev)
 			put_super(super_block[i].s_dev);
+	}
+
 	invalidate_inodes(dev);
 	invalidate_buffers(dev);
 }

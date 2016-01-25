@@ -158,6 +158,7 @@ int sys_setup(void * BIOS)
 
 	/* fetch partiton info */
 	for (drive = 0; drive < NR_HD; drive++) {
+		/* read boot sector */
 		if (!(bh = bread(0x300 + drive * 5, 0))) {
 			printk("Unable to read partition table of drive %d\n",
 				drive);
@@ -166,19 +167,20 @@ int sys_setup(void * BIOS)
 
 		if (bh->b_data[510] != 0x55 ||
 			((unsigned char)bh->b_data[511]) != 0xaa) {
-			printk("Bad partition table on drive %d\n\r",drive);
+			printk("Bad partition table on drive %d\n", drive);
 			panic("");
 		}
 
 		/* partition table is at 0x1be of first block */
 		p = 0x1be + (void *)bh->b_data;
 
-		/* calculate each partition's total sectors */
+		/* calculate each partition's start/total sectors */
 		for (i = 1; i < 5; i++, p++) {
-			hd[i + 5 * drive].start_sect = p->start_sect;
-			hd[i + 5 * drive].nr_sects = p->nr_sects;
+			hd[5 * drive + i].start_sect = p->start_sect;
+			hd[5 * drive + i].nr_sects = p->nr_sects;
+			printk("partition %d of HD %d start sector: %ld, nr_sects: %ld\n",
+				i, drive + 1, p->start_sect, p->nr_sects);
 		}
-
 		brelse(bh);
 	}
 	

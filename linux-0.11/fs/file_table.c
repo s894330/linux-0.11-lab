@@ -6,4 +6,5 @@
 
 #include <linux/fs.h>
 
+/* system simultaneously opened file nrs */
 struct file file_table[NR_FILE];

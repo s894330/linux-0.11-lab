@@ -12,10 +12,10 @@
 #include <linux/mm.h>
 #include <asm/system.h>
 
-struct m_inode inode_table[NR_INODE] = {{0, }, };
+struct m_inode inode_table[NR_INODE] = {{0}};
 
-static void read_inode(struct m_inode * inode);
-static void write_inode(struct m_inode * inode);
+static void read_inode(struct m_inode *inode);
+static void write_inode(struct m_inode *inode);
 
 static inline void wait_on_inode(struct m_inode *inode)
 {
@@ -208,7 +208,7 @@ struct m_inode *get_empty_inode(void)
 
 	do {
 		inode = NULL;
-		for (i = NR_INODE; i; i--) {
+		for (i = 0; i < NR_INODE; i++) {
 			if (++last_inode >= inode_table + NR_INODE)
 				last_inode = inode_table;
 

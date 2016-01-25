@@ -104,6 +104,23 @@ void put_super(int dev)
 	return;
 }
 
+static void show_super_block_detail(struct super_block *s)
+{
+	printk("    --- super block of 0x%x detail ---\n"
+		"\tmagic: 0x%x\n"
+		"\tinode numbers: %d\n"
+		"\tzone numbers: %d\n"
+		"\timap numbers: %d\n"
+		"\tzmap numbers: %d\n"
+		"\tfirst data zone number: %d\n"
+		"\tlog2(zone size/block size): %d\n"
+		"\tfile maximum size: %ld\n",
+		s->s_dev, s->s_magic, s->s_ninodes, s->s_nzones,
+		s->s_imap_blocks, s->s_zmap_blocks, s->s_firstdatazone,
+		s->s_log_zone_size, s->s_max_size);	
+}
+
+/* read super block and imap/zmap blocks into buffer_head */
 static struct super_block *read_super(int dev)
 {
 	struct super_block *s;
@@ -133,8 +150,8 @@ static struct super_block *read_super(int dev)
 	s->s_time = 0;
 	s->s_rd_only = 0;
 	s->s_dirt = 0;
-	lock_super(s);
 
+	lock_super(s);
 	if (!(bh = bread(dev, 1))) {
 		s->s_dev = 0;
 		unlock_super(s);
@@ -144,6 +161,8 @@ static struct super_block *read_super(int dev)
 	/* copy super block data */
 	*((struct d_super_block *)s) = *((struct d_super_block *)bh->b_data);
 	brelse(bh);
+
+	show_super_block_detail(s);
 
 	/* currently only support MINIX 1.0 file system */
 	if (s->s_magic != SUPER_MAGIC) {
@@ -158,7 +177,9 @@ static struct super_block *read_super(int dev)
 	for (i = 0; i < Z_MAP_SLOTS; i++)
 		s->s_zmap[i] = NULL;
 
-	block = 2;
+	block = 2;  /* skip boot block and super block */
+
+	/* read imap */
 	for (i = 0; i < s->s_imap_blocks; i++) {
 		if ((s->s_imap[i] = bread(dev, block)))
 			block++;
@@ -166,6 +187,7 @@ static struct super_block *read_super(int dev)
 			break;
 	}
 
+	/* read zmap */
 	for (i = 0; i < s->s_zmap_blocks; i++) {
 		if ((s->s_zmap[i] = bread(dev, block)))
 			block++;

@@ -37,17 +37,18 @@
  * I don't know if we should look at just the euid or both euid and
  * uid, but that should be easily changed.
  */
-static int permission(struct m_inode * inode,int mask)
+static int permission(struct m_inode *inode, int mask)
 {
 	int mode = inode->i_mode;
 
-/* special case: not even root can read/write a deleted file */
+	/* special case: not even root can read/write a deleted file */
 	if (inode->i_dev && !inode->i_nlinks)
 		return 0;
-	else if (current->euid==inode->i_uid)
+	else if (current->euid == inode->i_uid)
 		mode >>= 6;
-	else if (current->egid==inode->i_gid)
+	else if (current->egid == inode->i_gid)
 		mode >>= 3;
+
 	if (((mode & mask & 0007) == mask) || suser())
 		return 1;
 	return 0;
@@ -60,18 +61,19 @@ static int permission(struct m_inode * inode,int mask)
  *
  * NOTE! unlike strncmp, match returns 1 for success, 0 for failure.
  */
-static int match(int len,const char * name,struct dir_entry * de)
+static int match(int len, const char *name, struct dir_entry *de)
 {
-	register int same ;
+	register int same;
 
-	if (!de || !de->inode || len > NAME_LEN)
+	if (!de || !de->inode_nr || len > NAME_LEN)
 		return 0;
 	if (len < NAME_LEN && de->name[len])
 		return 0;
 	
 	__asm__("cld\n\t"
+		/* repeat compare using fs segment(user space) */
 		"fs; repe; cmpsb\n\t"
-		"setz %%al"
+		"setz %%al" /* if [edi] == [esi], set al to 1 */
 		:"=a" (same)
 		:"0" (0), "S" ((long)name), "D" ((long)de->name), "c" (len));
 
@@ -89,14 +91,17 @@ static int match(int len,const char * name,struct dir_entry * de)
  * This also takes care of the few special cases due to '..'-traversal
  * over a pseudo-root and a mount point.
  */
-static struct buffer_head * find_entry(struct m_inode ** dir,
-	const char * name, int namelen, struct dir_entry ** res_dir)
+static struct buffer_head *find_entry(struct m_inode **dir, const char *name,
+	int namelen, struct dir_entry **res_dir)
 {
 	int entries;
-	int block,i;
-	struct buffer_head * bh;
-	struct dir_entry * de;
-	struct super_block * sb;
+	int block, i;
+	struct buffer_head *bh;
+	struct dir_entry *de;
+	struct super_block *sb;
+
+	if (!namelen)
+		return NULL;
 
 #ifdef NO_TRUNCATE
 	if (namelen > NAME_LEN)
@@ -105,50 +110,65 @@ static struct buffer_head * find_entry(struct m_inode ** dir,
 	if (namelen > NAME_LEN)
 		namelen = NAME_LEN;
 #endif
-	entries = (*dir)->i_size / (sizeof (struct dir_entry));
+	entries = (*dir)->i_size / (sizeof(struct dir_entry));
 	*res_dir = NULL;
-	if (!namelen)
-		return NULL;
-/* check for '..', as we might have to do some "magic" for it */
-	if (namelen==2 && get_fs_byte(name)=='.' && get_fs_byte(name+1)=='.') {
-/* '..' in a pseudo-root results in a faked '.' (just change namelen) */
-		if ((*dir) == current->root)
-			namelen=1;
-		else if ((*dir)->i_num == ROOT_INO) {
-/* '..' over a mount-point results in 'dir' being exchanged for the mounted
-   directory-inode. NOTE! We set mounted, so that we can iput the new dir */
-			sb=get_super((*dir)->i_dev);
+
+	/* check for '..', as we might have to do some "magic" for it */
+	if (namelen == 2 && get_fs_byte(name) == '.' &&
+		get_fs_byte(name + 1)=='.') {
+		
+		/* 
+		 * '..' in a pseudo-root results in a faked '.'
+		 * (just change namelen)
+		 */
+		if ((*dir) == current->root) {
+			namelen = 1;
+		} else if ((*dir)->i_num == ROOT_INO) {
+			/* 
+			 * '..' over a mount-point results in 'dir' being
+			 * exchanged for the mounted directory-inode. NOTE! We
+			 * set mounted, so that we can iput the new dir
+			 */
+			sb = get_super((*dir)->i_dev);
 			if (sb->s_imount) {
 				iput(*dir);
-				(*dir)=sb->s_imount;
+				(*dir) = sb->s_imount;
 				(*dir)->i_count++;
 			}
 		}
 	}
+
 	if (!(block = (*dir)->i_zone[0]))
 		return NULL;
-	if (!(bh = bread((*dir)->i_dev,block)))
+
+	if (!(bh = bread((*dir)->i_dev, block)))
 		return NULL;
+
 	i = 0;
-	de = (struct dir_entry *) bh->b_data;
+	de = (struct dir_entry *)bh->b_data;
 	while (i < entries) {
-		if ((char *)de >= BLOCK_SIZE+bh->b_data) {
+		/* check next block */
+		if ((char *)de >= BLOCK_SIZE + bh->b_data) {
 			brelse(bh);
 			bh = NULL;
-			if (!(block = bmap(*dir,i/DIR_ENTRIES_PER_BLOCK)) ||
-			    !(bh = bread((*dir)->i_dev,block))) {
+
+			if (!(block = bmap(*dir, i / DIR_ENTRIES_PER_BLOCK)) ||
+			    !(bh = bread((*dir)->i_dev, block))) {
 				i += DIR_ENTRIES_PER_BLOCK;
 				continue;
 			}
-			de = (struct dir_entry *) bh->b_data;
+
+			de = (struct dir_entry *)bh->b_data;
 		}
-		if (match(namelen,name,de)) {
+
+		if (match(namelen, name, de)) {
 			*res_dir = de;
 			return bh;
 		}
 		de++;
 		i++;
 	}
+
 	brelse(bh);
 	return NULL;
 }
@@ -200,12 +220,12 @@ static struct buffer_head * add_entry(struct m_inode * dir,
 			de = (struct dir_entry *) bh->b_data;
 		}
 		if (i*sizeof(struct dir_entry) >= dir->i_size) {
-			de->inode=0;
+			de->inode_nr=0;
 			dir->i_size = (i+1)*sizeof(struct dir_entry);
 			dir->i_dirt = 1;
 			dir->i_ctime = CURRENT_TIME;
 		}
-		if (!de->inode) {
+		if (!de->inode_nr) {
 			dir->i_mtime = CURRENT_TIME;
 			for (i=0; i < NAME_LEN ; i++)
 				de->name[i]=(i<namelen)?get_fs_byte(name+i):0;
@@ -226,46 +246,58 @@ static struct buffer_head * add_entry(struct m_inode * dir,
  * Getdir traverses the pathname until it hits the topmost directory.
  * It returns NULL on failure.
  */
-static struct m_inode * get_dir(const char * pathname)
+static struct m_inode *get_dir(const char *pathname)
 {
 	char c;
-	const char * thisname;
-	struct m_inode * inode;
-	struct buffer_head * bh;
-	int namelen,inr,idev;
-	struct dir_entry * de;
+	const char *thisname;
+	struct m_inode *inode;
+	struct buffer_head *bh;
+	int namelen, inr, idev;
+	struct dir_entry *de;
 
 	if (!current->root || !current->root->i_count)
 		panic("No root inode");
 	if (!current->pwd || !current->pwd->i_count)
 		panic("No cwd inode");
-	if ((c=get_fs_byte(pathname))=='/') {
+
+	if ((c = get_fs_byte(pathname)) == '/') {
 		inode = current->root;
 		pathname++;
-	} else if (c)
+	} else if (c) {
 		inode = current->pwd;
-	else
+	} else {
 		return NULL;	/* empty name is bad */
+	}
+
+	/* because we are using this inode, add reference */
 	inode->i_count++;
+
 	while (1) {
 		thisname = pathname;
-		if (!S_ISDIR(inode->i_mode) || !permission(inode,MAY_EXEC)) {
+
+		if (!S_ISDIR(inode->i_mode) || !permission(inode, MAY_EXEC)) {
 			iput(inode);
 			return NULL;
 		}
-		for(namelen=0;(c=get_fs_byte(pathname++))&&(c!='/');namelen++)
+
+		/* find next '/' and calculate len before '/' */
+		for (namelen = 0; (c = get_fs_byte(pathname++)) && (c != '/');
+			namelen++)
 			/* nothing */ ;
-		if (!c)
+
+		if (!c)	/* reach the end, return */
 			return inode;
-		if (!(bh = find_entry(&inode,thisname,namelen,&de))) {
+
+		if (!(bh = find_entry(&inode, thisname, namelen, &de))) {
 			iput(inode);
 			return NULL;
 		}
-		inr = de->inode;
+
+		inr = de->inode_nr;
 		idev = inode->i_dev;
 		brelse(bh);
 		iput(inode);
-		if (!(inode = iget(idev,inr)))
+		if (!(inode = iget(idev, inr)))
 			return NULL;
 	}
 }
@@ -276,21 +308,26 @@ static struct m_inode * get_dir(const char * pathname)
  * dir_namei() returns the inode of the directory of the
  * specified name, and the name within that directory.
  */
-static struct m_inode * dir_namei(const char * pathname,
-	int * namelen, const char ** name)
+static struct m_inode *dir_namei(const char *pathname, int *namelen,
+	const char **name)
 {
 	char c;
-	const char * basename;
-	struct m_inode * dir;
+	const char *basename;
+	struct m_inode *dir;
 
 	if (!(dir = get_dir(pathname)))
 		return NULL;
+
+	/* find the name and length after last '/' */
 	basename = pathname;
-	while ((c=get_fs_byte(pathname++)))
-		if (c=='/')
-			basename=pathname;
-	*namelen = pathname-basename-1;
+	while ((c = get_fs_byte(pathname++))) {
+		if (c == '/')
+			basename = pathname;
+	}
+
+	*namelen = pathname - basename - 1;
 	*name = basename;
+
 	return dir;
 }
 
@@ -318,7 +355,7 @@ struct m_inode * namei(const char * pathname)
 		iput(dir);
 		return NULL;
 	}
-	inr = de->inode;
+	inr = de->inode_nr;
 	dev = dir->i_dev;
 	brelse(bh);
 	iput(dir);
@@ -335,36 +372,46 @@ struct m_inode * namei(const char * pathname)
  *
  * namei for open - this is in fact almost the whole open-routine.
  */
-int open_namei(const char * pathname, int flag, int mode,
-	struct m_inode ** res_inode)
+int open_namei(const char *pathname, int flag, int mode, 
+	struct m_inode **res_inode)
 {
-	const char * basename;
-	int inr,dev,namelen;
-	struct m_inode * dir, *inode;
-	struct buffer_head * bh;
-	struct dir_entry * de;
+	const char *basename;
+	int inr, dev, namelen;
+	struct m_inode *dir, *inode;
+	struct buffer_head *bh;
+	struct dir_entry *de;
 
 	if ((flag & O_TRUNC) && !(flag & O_ACCMODE))
 		flag |= O_WRONLY;
+
 	mode &= 0777 & ~current->umask;
 	mode |= I_REGULAR;
-	if (!(dir = dir_namei(pathname,&namelen,&basename)))
+
+	/* 
+	 * after this call, basename is the name after last '/', dir is the 
+	 * inode struct previous last '/'.
+	 * ex: pathname = /dev/tty0, after call, dir is inode of dev,
+	 * basename = tty0
+	 */
+	if (!(dir = dir_namei(pathname, &namelen, &basename)))
 		return -ENOENT;
+
 	if (!namelen) {			/* special case: '/usr/' etc */
-		if (!(flag & (O_ACCMODE|O_CREAT|O_TRUNC))) {
-			*res_inode=dir;
+		if (!(flag & (O_ACCMODE | O_CREAT | O_TRUNC))) {
+			*res_inode = dir;
 			return 0;
 		}
 		iput(dir);
 		return -EISDIR;
 	}
-	bh = find_entry(&dir,basename,namelen,&de);
+
+	bh = find_entry(&dir, basename, namelen, &de);
 	if (!bh) {
 		if (!(flag & O_CREAT)) {
 			iput(dir);
 			return -ENOENT;
 		}
-		if (!permission(dir,MAY_WRITE)) {
+		if (!permission(dir, MAY_WRITE)) {
 			iput(dir);
 			return -EACCES;
 		}
@@ -376,36 +423,41 @@ int open_namei(const char * pathname, int flag, int mode,
 		inode->i_uid = current->euid;
 		inode->i_mode = mode;
 		inode->i_dirt = 1;
-		bh = add_entry(dir,basename,namelen,&de);
+		bh = add_entry(dir, basename, namelen, &de);
 		if (!bh) {
 			inode->i_nlinks--;
 			iput(inode);
 			iput(dir);
 			return -ENOSPC;
 		}
-		de->inode = inode->i_num;
+		de->inode_nr = inode->i_num;
 		bh->b_dirt = 1;
 		brelse(bh);
 		iput(dir);
 		*res_inode = inode;
 		return 0;
 	}
-	inr = de->inode;
+
+	inr = de->inode_nr;
 	dev = dir->i_dev;
 	brelse(bh);
 	iput(dir);
+
 	if (flag & O_EXCL)
 		return -EEXIST;
-	if (!(inode=iget(dev,inr)))
+	if (!(inode = iget(dev, inr)))
 		return -EACCES;
 	if ((S_ISDIR(inode->i_mode) && (flag & O_ACCMODE)) ||
-	    !permission(inode,ACC_MODE(flag))) {
+		!permission(inode, ACC_MODE(flag))) {
 		iput(inode);
 		return -EPERM;
 	}
+
 	inode->i_atime = CURRENT_TIME;
+	
 	if (flag & O_TRUNC)
 		truncate(inode);
+
 	*res_inode = inode;
 	return 0;
 }
@@ -453,7 +505,7 @@ int sys_mknod(const char * filename, int mode, int dev)
 		iput(inode);
 		return -ENOSPC;
 	}
-	de->inode = inode->i_num;
+	de->inode_nr = inode->i_num;
 	bh->b_dirt = 1;
 	iput(dir);
 	iput(inode);
@@ -510,10 +562,10 @@ int sys_mkdir(const char * pathname, int mode)
 		return -ERROR;
 	}
 	de = (struct dir_entry *) dir_block->b_data;
-	de->inode=inode->i_num;
+	de->inode_nr=inode->i_num;
 	strcpy(de->name,".");
 	de++;
-	de->inode = dir->i_num;
+	de->inode_nr = dir->i_num;
 	strcpy(de->name,"..");
 	inode->i_nlinks = 2;
 	dir_block->b_dirt = 1;
@@ -528,7 +580,7 @@ int sys_mkdir(const char * pathname, int mode)
 		iput(inode);
 		return -ENOSPC;
 	}
-	de->inode = inode->i_num;
+	de->inode_nr = inode->i_num;
 	bh->b_dirt = 1;
 	dir->i_nlinks++;
 	dir->i_dirt = 1;
@@ -555,7 +607,7 @@ static int empty_dir(struct m_inode * inode)
 		return 0;
 	}
 	de = (struct dir_entry *) bh->b_data;
-	if (de[0].inode != inode->i_num || !de[1].inode || 
+	if (de[0].inode_nr != inode->i_num || !de[1].inode_nr || 
 	    strcmp(".",de[0].name) || strcmp("..",de[1].name)) {
 	    	printk("warning - bad directory on dev %04x\n",inode->i_dev);
 		return 0;
@@ -574,7 +626,7 @@ static int empty_dir(struct m_inode * inode)
 				return 0;
 			de = (struct dir_entry *) bh->b_data;
 		}
-		if (de->inode) {
+		if (de->inode_nr) {
 			brelse(bh);
 			return 0;
 		}
@@ -610,7 +662,7 @@ int sys_rmdir(const char * name)
 		iput(dir);
 		return -ENOENT;
 	}
-	if (!(inode = iget(dir->i_dev, de->inode))) {
+	if (!(inode = iget(dir->i_dev, de->inode_nr))) {
 		iput(dir);
 		brelse(bh);
 		return -EPERM;
@@ -648,7 +700,7 @@ int sys_rmdir(const char * name)
 	}
 	if (inode->i_nlinks != 2)
 		printk("empty directory has nlink!=2 (%d)",inode->i_nlinks);
-	de->inode = 0;
+	de->inode_nr = 0;
 	bh->b_dirt = 1;
 	brelse(bh);
 	inode->i_nlinks=0;
@@ -684,7 +736,7 @@ int sys_unlink(const char * name)
 		iput(dir);
 		return -ENOENT;
 	}
-	if (!(inode = iget(dir->i_dev, de->inode))) {
+	if (!(inode = iget(dir->i_dev, de->inode_nr))) {
 		iput(dir);
 		brelse(bh);
 		return -ENOENT;
@@ -708,7 +760,7 @@ int sys_unlink(const char * name)
 			inode->i_dev,inode->i_num,inode->i_nlinks);
 		inode->i_nlinks=1;
 	}
-	de->inode = 0;
+	de->inode_nr = 0;
 	bh->b_dirt = 1;
 	brelse(bh);
 	inode->i_nlinks--;
@@ -767,7 +819,7 @@ int sys_link(const char * oldname, const char * newname)
 		iput(oldinode);
 		return -ENOSPC;
 	}
-	de->inode = oldinode->i_num;
+	de->inode_nr = oldinode->i_num;
 	bh->b_dirt = 1;
 	brelse(bh);
 	iput(dir);

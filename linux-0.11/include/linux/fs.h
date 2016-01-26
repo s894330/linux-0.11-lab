@@ -163,7 +163,7 @@ struct d_super_block {
 };
 
 struct dir_entry {
-	unsigned short inode;
+	unsigned short inode_nr;
 	char name[NAME_LEN];
 };
 

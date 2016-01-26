@@ -161,6 +161,8 @@ void iput(struct m_inode *inode)
 		wake_up(&inode->i_wait);
 		if (--inode->i_count)
 			return;
+
+		/* inode->i_count = 0, free memory used by pipe */
 		free_page(inode->i_size);
 		inode->i_count = 0;
 		inode->i_dirt = 0;
@@ -196,7 +198,6 @@ repeat:
 	}
 
 	inode->i_count--;
-
 	return;
 }
 
@@ -256,6 +257,7 @@ struct m_inode * get_pipe_inode(void)
 	return inode;
 }
 
+/* read inode into buffer_head */
 struct m_inode *iget(int dev, int nr)
 {
 	struct m_inode *inode, *empty;
@@ -263,9 +265,11 @@ struct m_inode *iget(int dev, int nr)
 	if (!dev)
 		panic("iget with dev == 0");
 
+	/* get empty inode struct form inode_table */
 	empty = get_empty_inode();
+
 	inode = inode_table;
-	while (inode < NR_INODE + inode_table) {
+	while (inode < inode_table + NR_INODE) {
 		if (inode->i_dev != dev || inode->i_num != nr) {
 			inode++;
 			continue;
@@ -273,12 +277,14 @@ struct m_inode *iget(int dev, int nr)
 
 		wait_on_inode(inode);
 
+		/* if inode has been changed during we sleep, loop again */
 		if (inode->i_dev != dev || inode->i_num != nr) {
 			inode = inode_table;
 			continue;
 		}
 
 		inode->i_count++;
+
 		if (inode->i_mount) {
 			int i;
 
@@ -287,10 +293,9 @@ struct m_inode *iget(int dev, int nr)
 					break;
 
 			if (i >= NR_SUPER) {
-				printk("Mounted inode hasn't got sb\n");
+				printk("Mounted inode hasn't got super block\n");
 				if (empty)
 					iput(empty);
-
 				return inode;
 			}
 
@@ -303,7 +308,6 @@ struct m_inode *iget(int dev, int nr)
 
 		if (empty)
 			iput(empty);
-
 		return inode;
 	}
 
@@ -313,6 +317,8 @@ struct m_inode *iget(int dev, int nr)
 	inode = empty;
 	inode->i_dev = dev;
 	inode->i_num = nr;
+
+	/* read inode into buffer_head */
 	read_inode(inode);
 
 	return inode;
@@ -362,6 +368,7 @@ static void write_inode(struct m_inode *inode)
 	if (!(bh = bread(inode->i_dev, block)))
 		panic("unable to read i-node block");
 
+	/* write inode value into buffer_head */
 	((struct d_inode *)bh->b_data)[(inode->i_num - 1) % INODES_PER_BLOCK] =
 		*(struct d_inode *)inode;
 

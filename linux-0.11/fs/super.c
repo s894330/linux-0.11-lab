@@ -19,12 +19,13 @@ int sync_dev(int dev);
 void wait_for_keypress(void);
 
 /* test_bit uses setb, as gas doesn't recognize setc */
-#define test_bit(bitnr,addr) ({ \
-register int __res; \
-__asm__("bt %2, %3\n\t" /* store bit value of %3 offset %2 into CF */ \
-	"setb %%al" /* set al according to value of CF, CF = 1 => al = 1 */ \
-	:"=a" (__res):"a" (0), "r" (bitnr), "m" (*(addr))); \
-__res;})
+#define test_bit(bitnr, addr) ({ \
+	register int __res; \
+	__asm__("bt %2, %3\n\t" /* store bit value of %3 offset %2 into CF */ \
+		"setb %%al" /* set al according to value of CF, CF = 1 => al = 1 */ \
+		:"=a" (__res):"a" (0), "r" (bitnr), "m" (*(addr))); \
+	__res; \
+})
 
 struct super_block super_block[NR_SUPER];
 /* this is initialized in init/main.c */
@@ -334,19 +335,21 @@ void mount_root(void)
 	current->pwd = mi;
 	current->root = mi;
 
-	/* check free block nr */
+	/* check free block nrs */
 	free = 0;
 	i = p->s_nzones;
-	while (--i >= 0)
+	while (--i >= 0) {
 		if (!test_bit(i & 8191, p->s_zmap[i >> 13]->b_data))
 			free++;
+	}
 	printk("%d/%d free blocks\n", free, p->s_nzones);
 
-	/* check free inode nr */
+	/* check free inode nrs */
 	free = 0;
-	i = p->s_ninodes + 1;
-	while (--i >= 0)
+	i = p->s_ninodes + 1; /* include inode 0 */
+	while (--i >= 0) {
 		if (!test_bit(i & 8191, p->s_imap[i >> 13]->b_data))
 			free++;
+	}
 	printk("%d/%d free inodes\n", free, p->s_ninodes);
 }

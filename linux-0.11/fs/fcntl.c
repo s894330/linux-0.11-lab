@@ -15,21 +15,31 @@
 
 extern int sys_close(int fd);
 
+/* 
+ * fd: which we want to duplicate
+ * arg: the min fd value we can used to be duplicated to
+ * */
 static int dupfd(unsigned int fd, unsigned int arg)
 {
 	if (fd >= NR_OPEN || !current->filp[fd])
 		return -EBADF;
 	if (arg >= NR_OPEN)
 		return -EINVAL;
-	while (arg < NR_OPEN)
+
+	while (arg < NR_OPEN) {
 		if (current->filp[arg])
 			arg++;
 		else
 			break;
+	}
+
 	if (arg >= NR_OPEN)
 		return -EMFILE;
-	current->close_on_exec &= ~(1<<arg);
-	(current->filp[arg] = current->filp[fd])->f_count++;
+
+	current->close_on_exec &= ~(1 << arg);
+	current->filp[arg] = current->filp[fd];
+	current->filp[fd]->f_count++;
+
 	return arg;
 }
 
@@ -41,7 +51,7 @@ int sys_dup2(unsigned int oldfd, unsigned int newfd)
 
 int sys_dup(unsigned int fildes)
 {
-	return dupfd(fildes,0);
+	return dupfd(fildes, 0);
 }
 
 int sys_fcntl(unsigned int fd, unsigned int cmd, unsigned long arg)

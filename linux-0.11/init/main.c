@@ -184,13 +184,13 @@ static char *envp[] = {"HOME=/usr/root", NULL};
 
 void init(void)
 {
-	int pid, i;
+	int pid, stat;
 
 	setup((void *)&drive_info);
 	open("/dev/tty0", O_RDWR, 0);
-	dup(0);
-	dup(0);
-	printf("%d buffers = %d bytes buffer space\n", NR_BUFFERS,
+	dup(0);	/* duplicate fd 0 to fd 1(stdin) */
+	dup(0);	/* duplicate fd 0 to fd 2(stderr) */
+	printf("%d buffer_head = %d bytes buffer space\n", NR_BUFFERS,
 		NR_BUFFERS * BLOCK_SIZE);
 	printf("Free mem: %d bytes\n", memory_end - main_memory_start);
 
@@ -202,9 +202,10 @@ void init(void)
 		_exit(2);
 	}
 
-	if (pid > 0)
-		while (pid != wait(&i))
+	if (pid > 0) {
+		while (pid != wait(&stat))
 			/* nothing */;
+	}
 
 	while (1) {
 		if ((pid = fork()) < 0) {
@@ -224,9 +225,9 @@ void init(void)
 		}
 
 		while (1)
-			if (pid == wait(&i))
+			if (pid == wait(&stat))
 				break;
-		printf("\nchild %d died with code %04x\n", pid, i);
+		printf("\nchild %d died with code %04x\n", pid, stat);
 		sync();
 	}
 

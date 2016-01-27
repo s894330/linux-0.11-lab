@@ -94,13 +94,16 @@ unsigned long get_free_page(void)
  */
 void free_page(unsigned long addr)
 {
-	if (addr < LOW_MEM) return;
+	if (addr < LOW_MEM)
+		return;
 	if (addr >= HIGH_MEMORY)
 		panic("trying to free nonexistent page");
+
 	addr -= LOW_MEM;
 	addr >>= 12;
-	if (mem_map[addr]--) return;
-	mem_map[addr]=0;
+	if (mem_map[addr]--)
+		return;
+	mem_map[addr] = 0;
 	panic("trying to free free page");
 }
 
@@ -307,14 +310,23 @@ void do_wp_page(unsigned long error_code, unsigned long address)
 
 void write_verify(unsigned long address)
 {
-	unsigned long page;
+	unsigned long *pdt_entry;
+	unsigned long *pgt_entry;
 
-	if (!( (page = *((unsigned long *) ((address>>20) & 0xffc)) )&1))
+	pdt_entry = (unsigned long *)((address >> 22) * 4);
+
+	/* 
+	 * if pgt_entry not exist, CPU will cause page not found error, thus
+	 * call do_no_page routine, so we can directly return
+	 */
+	if (!(*pdt_entry & 1))
 		return;
-	page &= 0xfffff000;
-	page += ((address>>10) & 0xffc);
-	if ((3 & *(unsigned long *) page) == 1)  /* non-writeable, present */
-		un_wp_page((unsigned long *) page);
+
+	pgt_entry = (unsigned long *)
+		((*pdt_entry) & 0xfffff000) + (((address >> 12) & 0x3ff) * 4);
+
+	if ((3 & *pgt_entry) == 1)  /* non-writeable, present */
+		un_wp_page(pgt_entry);
 	return;
 }
 

@@ -16,19 +16,21 @@
 int sys_pause(void);
 int sys_close(int fd);
 
-void release(struct task_struct * p)
+void release(struct task_struct *p)
 {
 	int i;
 
 	if (!p)
 		return;
-	for (i=1 ; i<NR_TASKS ; i++)
-		if (task[i]==p) {
-			task[i]=NULL;
+
+	for (i = 1; i < NR_TASKS; i++) {
+		if (task[i] == p) {
+			task[i] = NULL;
 			free_page((long)p);
 			schedule();
 			return;
 		}
+	}
 	panic("trying to release non-existent task");
 }
 
@@ -138,20 +140,26 @@ int sys_exit(int error_code)
 	return do_exit((error_code&0xff)<<8);
 }
 
-int sys_waitpid(pid_t pid,unsigned long * stat_addr, int options)
+int sys_waitpid(pid_t pid, unsigned long *stat_addr, int options)
 {
 	int flag, code;
-	struct task_struct ** p;
+	struct task_struct **p;
 
-	verify_area(stat_addr,4);
+	/* 
+	 * we are in kernel space, stat_addr is stay in user space which we want
+	 * to write, but the page protect mechanism and copy-on-write will be
+	 * useless if we are in privilege 0 code, so we need to do this by hand
+	 */
+	verify_area(stat_addr, 4);
 repeat:
-	flag=0;
-	for(p = &LAST_TASK ; p > &FIRST_TASK ; --p) {
+	flag = 0;
+	for(p = &LAST_TASK; p > &FIRST_TASK; --p) {
 		if (!*p || *p == current)
 			continue;
 		if ((*p)->father != current->pid)
 			continue;
-		if (pid>0) {
+
+		if (pid > 0) {
 			if ((*p)->pid != pid)
 				continue;
 		} else if (!pid) {
@@ -161,11 +169,12 @@ repeat:
 			if ((*p)->pgrp != -pid)
 				continue;
 		}
+
 		switch ((*p)->state) {
 			case TASK_STOPPED:
 				if (!(options & WUNTRACED))
 					continue;
-				put_fs_long(0x7f,stat_addr);
+				put_fs_long(0x7f, stat_addr);
 				return (*p)->pid;
 			case TASK_ZOMBIE:
 				current->cutime += (*p)->utime;
@@ -173,23 +182,26 @@ repeat:
 				flag = (*p)->pid;
 				code = (*p)->exit_code;
 				release(*p);
-				put_fs_long(code,stat_addr);
+				put_fs_long(code, stat_addr);
 				return flag;
 			default:
-				flag=1;
+				flag = 1;
 				continue;
 		}
 	}
+
 	if (flag) {
 		if (options & WNOHANG)
 			return 0;
-		current->state=TASK_INTERRUPTIBLE;
+		current->state = TASK_INTERRUPTIBLE;
 		schedule();
-		if (!(current->signal &= ~(1<<(SIGCHLD-1))))
+
+		if (!(current->signal &= ~(1 << (SIGCHLD - 1))))
 			goto repeat;
 		else
 			return -EINTR;
 	}
+
 	return -ECHILD;
 }
 

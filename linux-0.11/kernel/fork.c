@@ -22,18 +22,23 @@ extern void write_verify(unsigned long address);
 
 long last_pid = 0;
 
-void verify_area(void * addr,int size)
+void verify_area(void *addr, int size)
 {
 	unsigned long start;
+	unsigned long page;
+	int offset;
 
-	start = (unsigned long) addr;
-	size += start & 0xfff;
-	start &= 0xfffff000;
-	start += get_base(current->ldt[2]);
-	while (size>0) {
-		size -= 4096;
-		write_verify(start);
-		start += 4096;
+	start = (unsigned long)addr;
+	offset = size + (start & 0xfff);
+	page = start & 0xfffff000;
+
+	/* change page addr to linear addr */
+	page += get_base(current->ldt[2]);
+
+	while (offset > 0) {
+		offset -= 4096;
+		write_verify(page);
+		page += 4096;
 	}
 }
 

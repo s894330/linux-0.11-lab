@@ -25,10 +25,8 @@
  * GCC does not inline any functions when not optimizing unless you specify the
  * ‘always_inline’ attribute for the function
  */
-static inline int fork(void) __attribute__((always_inline));
-static inline int pause(void) __attribute__((always_inline));
-static inline _syscall0(int, fork)
-static inline _syscall0(int, pause)
+static inline __attribute__((always_inline)) _syscall0(int, fork)
+static inline __attribute__((always_inline)) _syscall0(int, pause)
 static inline _syscall1(int, setup, void *, BIOS)
 static inline _syscall0(int, sync)
 

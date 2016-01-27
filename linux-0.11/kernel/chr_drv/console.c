@@ -304,10 +304,14 @@ void csi_m(void)
 static inline void set_cursor(void)
 {
 	cli();
+	/* select register 14 */
 	outb_p(14, video_port_reg);
-	outb_p(0xff&((pos-video_mem_start)>>9), video_port_val);
+	/* write high 8 bit of pos */
+	outb_p(0xff & (((pos - video_mem_start) >> 8) / 2), video_port_val);
+	/* select register 15 */
 	outb_p(15, video_port_reg);
-	outb_p(0xff&((pos-video_mem_start)>>1), video_port_val);
+	/* write low 8 bit of pos */
+	outb_p(0xff & ((pos - video_mem_start) / 2), video_port_val);
 	sti();
 }
 
@@ -419,13 +423,13 @@ static void csi_M(unsigned int nr)
 		delete_line();
 }
 
-static int saved_x=0;
-static int saved_y=0;
+static int saved_x = 0;
+static int saved_y = 0;
 
 static void save_cur(void)
 {
-	saved_x=x;
-	saved_y=y;
+	saved_x = x;
+	saved_y = y;
 }
 
 static void restore_cur(void)
@@ -501,7 +505,7 @@ void console_write(struct tty_struct *tty)
 			else if (c == '8')
 				restore_cur();
 			break;
-		case 2:
+		case 2:	/* enter this case if previous 2 char is <Esc> + [ */
 			for(npar = 0; npar < NPAR; npar++)
 				par[npar] = 0;
 			npar = 0;

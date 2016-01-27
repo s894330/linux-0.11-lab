@@ -16,12 +16,12 @@
 extern int tty_read(unsigned minor,char * buf,int count);
 extern int tty_write(unsigned minor,char * buf,int count);
 
-typedef int (*crw_ptr)(int rw,unsigned minor,char * buf,int count,off_t * pos);
+typedef int (*crw_ptr)(int rw, unsigned minor, char *buf, int count, off_t *pos);
 
-static int rw_ttyx(int rw,unsigned minor,char * buf,int count,off_t * pos)
+static int rw_ttyx(int rw, unsigned minor, char *buf, int count, off_t *pos)
 {
-	return ((rw==READ)?tty_read(minor,buf,count):
-		tty_write(minor,buf,count));
+	return ((rw == READ) ?
+		tty_read(minor, buf, count) : tty_write(minor, buf, count));
 }
 
 static int rw_tty(int rw,unsigned minor,char * buf,int count, off_t * pos)
@@ -80,9 +80,9 @@ static int rw_memory(int rw, unsigned minor, char * buf, int count, off_t * pos)
 	}
 }
 
-#define NRDEVS ((sizeof (crw_table))/(sizeof (crw_ptr)))
+#define NRDEVS ((sizeof(crw_table)) / (sizeof(crw_ptr)))
 
-static crw_ptr crw_table[]={
+static crw_ptr crw_table[] = {
 	NULL,		/* nodev */
 	rw_memory,	/* /dev/mem etc */
 	NULL,		/* /dev/fd */
@@ -90,15 +90,17 @@ static crw_ptr crw_table[]={
 	rw_ttyx,	/* /dev/ttyx */
 	rw_tty,		/* /dev/tty */
 	NULL,		/* /dev/lp */
-	NULL};		/* unnamed pipes */
+	NULL		/* unnamed pipes */
+};
 
-int rw_char(int rw,int dev, char * buf, int count, off_t * pos)
+int rw_char(int rw, int dev, char *buf, int count, off_t *pos)
 {
 	crw_ptr call_addr;
 
-	if (MAJOR(dev)>=NRDEVS)
+	if (MAJOR(dev) >= NRDEVS)
 		return -ENODEV;
-	if (!(call_addr=crw_table[MAJOR(dev)]))
+	if (!(call_addr = crw_table[MAJOR(dev)]))
 		return -ENODEV;
-	return call_addr(rw,MINOR(dev),buf,count,pos);
+
+	return call_addr(rw, MINOR(dev), buf, count, pos);
 }

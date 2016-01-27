@@ -39,7 +39,7 @@ _start:
 	mov	$0x03, %ah	# read page 0 (bh) cursor pos, store at
 	xor	%bh, %bh	# dh: row, dl: column
 	int	$0x10
-	mov	%dx, %ds:0	# save it in known place, con_init fetches it
+	mov	%dx, %ds:0	# save it in known place, console_init fetches it
 				# from 0x90000.
 
 	# Get memory size (get extended mem (outside 1MB), kB),

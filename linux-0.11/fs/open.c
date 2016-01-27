@@ -212,18 +212,20 @@ int sys_creat(const char * pathname, int mode)
 
 int sys_close(unsigned int fd)
 {	
-	struct file * filp;
+	struct file *filp;
 
 	if (fd >= NR_OPEN)
 		return -EINVAL;
-	current->close_on_exec &= ~(1<<fd);
+	current->close_on_exec &= ~(1 << fd);
 	if (!(filp = current->filp[fd]))
 		return -EINVAL;
 	current->filp[fd] = NULL;
 	if (filp->f_count == 0)
 		panic("Close: file count is 0");
-	if (--filp->f_count)
-		return (0);
+	if (--filp->f_count)	/* still used by other process, just return */
+		return 0;
+
+	/* no anyone use this file, release it's inode struct */
 	iput(filp->f_inode);
-	return (0);
+	return 0;
 }

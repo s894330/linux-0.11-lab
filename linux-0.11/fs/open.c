@@ -202,7 +202,7 @@ int sys_open(const char *filename, int flag, int mode)
 	f->f_inode = inode;
 	f->f_pos = 0;
 
-	return (fd);
+	return fd;
 }
 
 int sys_creat(const char * pathname, int mode)

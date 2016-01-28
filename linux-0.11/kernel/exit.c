@@ -104,8 +104,8 @@ static void tell_father(int pid)
 int do_exit(long code)
 {
 	int i;
-	free_page_tables(get_base(current->ldt[1]),get_limit(0x0f));
-	free_page_tables(get_base(current->ldt[2]),get_limit(0x17));
+	free_page_tables(get_base(current->ldt[1]), get_limit(0x0f));
+	free_page_tables(get_base(current->ldt[2]), get_limit(0x17));
 	for (i=0 ; i<NR_TASKS ; i++)
 		if (task[i] && task[i]->father == current->pid) {
 			task[i]->father = 1;
@@ -132,12 +132,13 @@ int do_exit(long code)
 	current->exit_code = code;
 	tell_father(current->father);
 	schedule();
-	return (-1);	/* just to suppress warnings */
+	return -1;	/* just to suppress warnings */
 }
 
 int sys_exit(int error_code)
 {
-	return do_exit((error_code&0xff)<<8);
+	/* low 8 bit is used for wait()/waitpid(), so we need shift left */
+	return do_exit((error_code & 0xff) << 8);
 }
 
 int sys_waitpid(pid_t pid, unsigned long *stat_addr, int options)

@@ -189,13 +189,14 @@ void init(void)
 
 	setup((void *)&drive_info);
 	open("/dev/tty0", O_RDWR, 0);
-	dup(0);	/* duplicate fd 0 to fd 1(stdin) */
+	dup(0);	/* duplicate fd 0 to fd 1(stdout) */
 	dup(0);	/* duplicate fd 0 to fd 2(stderr) */
 	printf("%d buffer_head = %d bytes buffer space\n", NR_BUFFERS,
 		NR_BUFFERS * BLOCK_SIZE);
 	printf("Free mem: %d bytes\n", memory_end - main_memory_start);
 
 	if (!(pid = fork())) {
+		/* redirect stdin(fd 0) to /etc/rc */
 		close(0);		
 		if (open("/etc/rc", O_RDONLY, 0))
 			_exit(1);

@@ -17,7 +17,7 @@
  * would have taken more than the 6M I have free, but it worked well as
  * far as I could see.
  *
- * Also corrected some "invalidate()"s - I wasn't doing enough of them.
+ * Also corrected some "refresh_TLB()"s - I wasn't doing enough of them.
  */
 
 #include <signal.h>
@@ -36,7 +36,7 @@ static inline void oom(void)
 	do_exit(SIGSEGV);
 }
 
-#define invalidate() \
+#define refresh_TLB() \
 __asm__("movl %%eax, %%cr3"::"a" (0))
 
 /* these are not to be changed without changing head.s etc */
@@ -101,8 +101,10 @@ void free_page(unsigned long addr)
 
 	addr -= LOW_MEM;
 	addr >>= 12;
-	if (mem_map[addr]--)
+	if (mem_map[addr]) {
+		mem_map[addr]--;
 		return;
+	}
 	mem_map[addr] = 0;
 	panic("trying to free free page");
 }
@@ -111,31 +113,38 @@ void free_page(unsigned long addr)
  * This function frees a continuos block of page tables, as needed
  * by 'exit()'. As does copy_page_tables(), this handles only 4Mb blocks.
  */
-int free_page_tables(unsigned long from,unsigned long size)
+int free_page_tables(unsigned long from, unsigned long size)
 {
 	unsigned long *pg_table;
-	unsigned long * dir, nr;
+	unsigned long *dir, nr;
 
+	/* the page which we want to free must align to 4MB */
 	if (from & 0x3fffff)
 		panic("free_page_tables called with wrong alignment");
 	if (!from)
-		panic("Trying to free up swapper memory space");
+		panic("Trying to free up swapper(kernel) memory space");
+
+	/* 
+	 * calculate page nrs which we need to free. For example, if
+	 * size = 4.01MB, then (size + 0x3fffff) >> 22 = 2
+	 */
 	size = (size + 0x3fffff) >> 22;
-	dir = (unsigned long *) ((from>>20) & 0xffc); /* _pg_dir = 0 */
-	for ( ; size-->0 ; dir++) {
-		if (!(1 & *dir))
+	dir = (unsigned long *)((from >> 22) * 4); /* _pg_dir = 0 */
+	for (; size-- > 0; dir++) {
+		if (!(1 & *dir))    /* page table not exist, skip */
 			continue;
-		pg_table = (unsigned long *) (0xfffff000 & *dir);
-		for (nr=0 ; nr<1024 ; nr++) {
+		pg_table = (unsigned long *)(0xfffff000 & *dir);
+		for (nr = 0; nr < 1024; nr++) {
 			if (1 & *pg_table)
 				free_page(0xfffff000 & *pg_table);
 			*pg_table = 0;
 			pg_table++;
 		}
+		/* free page table itself */
 		free_page(0xfffff000 & *dir);
 		*dir = 0;
 	}
-	invalidate();
+	refresh_TLB();
 	return 0;
 }
 
@@ -225,7 +234,7 @@ int copy_page_tables(unsigned long from, unsigned long to, long size)
 		}
 	}
 
-	invalidate();
+	refresh_TLB();
 
 	return 0;
 }
@@ -256,7 +265,7 @@ unsigned long put_page(unsigned long page,unsigned long address)
 		page_table = (unsigned long *) tmp;
 	}
 	page_table[(address>>12) & 0x3ff] = page | 7;
-/* no need for invalidate */
+/* no need for refresh_TLB */
 	return page;
 }
 
@@ -268,7 +277,7 @@ void un_wp_page(unsigned long *table_entry)
 	old_page = 0xfffff000 & *table_entry;
 	if (old_page >= LOW_MEM && mem_map[MAP_NR(old_page)] == 1) {
 		*table_entry |= 2;
-		invalidate();
+		refresh_TLB();
 		return;
 	}
 
@@ -279,7 +288,7 @@ void un_wp_page(unsigned long *table_entry)
 		mem_map[MAP_NR(old_page)]--;
 
 	*table_entry = new_page | 7;
-	invalidate();
+	refresh_TLB();
 	copy_page(old_page, new_page);
 }	
 
@@ -386,7 +395,7 @@ static int try_to_share(unsigned long address, struct task_struct * p)
 /* share them: write-protect */
 	*(unsigned long *) from_page &= ~2;
 	*(unsigned long *) to_page = *(unsigned long *) from_page;
-	invalidate();
+	refresh_TLB();
 	phys_addr -= LOW_MEM;
 	phys_addr >>= 12;
 	mem_map[phys_addr]++;

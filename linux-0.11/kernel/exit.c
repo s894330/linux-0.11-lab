@@ -34,24 +34,26 @@ void release(struct task_struct *p)
 	panic("trying to release non-existent task");
 }
 
-static inline int send_sig(long sig,struct task_struct * p,int priv)
+static inline int send_sig(long sig, struct task_struct *p, int priv)
 {
-	if (!p || sig<1 || sig>32)
+	if (!p || sig < 1 || sig > 32)
 		return -EINVAL;
-	if (priv || (current->euid==p->euid) || suser())
-		p->signal |= (1<<(sig-1));
+
+	if (priv || (current->euid == p->euid) || suser())
+		p->signal |= (1 << (sig - 1));
 	else
 		return -EPERM;
+
 	return 0;
 }
 
 static void kill_session(void)
 {
-	struct task_struct **p = NR_TASKS + task;
+	struct task_struct **p = task + NR_TASKS;
 	
 	while (--p > &FIRST_TASK) {
 		if (*p && (*p)->session == current->session)
-			(*p)->signal |= 1<<(SIGHUP-1);
+			(*p)->signal |= 1 << (SIGHUP - 1);
 	}
 }
 
@@ -82,52 +84,74 @@ int sys_kill(int pid,int sig)
 	return retval;
 }
 
-static void tell_father(int pid)
+static void tell_father(int father_pid)
 {
 	int i;
 
-	if (pid)
-		for (i=0;i<NR_TASKS;i++) {
+	if (father_pid) {
+		for (i = 0; i < NR_TASKS; i++) {
 			if (!task[i])
 				continue;
-			if (task[i]->pid != pid)
+			if (task[i]->pid != father_pid)
 				continue;
-			task[i]->signal |= (1<<(SIGCHLD-1));
+			task[i]->signal |= (1 << (SIGCHLD - 1));
 			return;
 		}
-/* if we don't find any fathers, we just release ourselves */
-/* This is not really OK. Must change it to make father 1 */
-	printk("BAD BAD - no father found\n\r");
+	}
+
+	/* 
+	 * if we don't find any fathers, we just release ourselves, this is not
+	 * really OK. Must change it to make father 1
+	 */
+	printk("BAD BAD - no father found\n");
 	release(current);
 }
 
 int do_exit(long code)
 {
 	int i;
+
 	free_page_tables(get_base(current->ldt[1]), get_limit(0x0f));
 	free_page_tables(get_base(current->ldt[2]), get_limit(0x17));
-	for (i=0 ; i<NR_TASKS ; i++)
+
+	for (i = 0; i < NR_TASKS; i++) {
 		if (task[i] && task[i]->father == current->pid) {
 			task[i]->father = 1;
-			if (task[i]->state == TASK_ZOMBIE)
+			if (task[i]->state == TASK_ZOMBIE) {
+				/* 
+				 * cast unused return value to void is to
+				 * explicitly show other "developers" that you
+				 * know this function returns but you're
+				 * explicitly ignoring it
+				 *
+				 * cast to void is costless. It is only
+				 * information for compiler how to treat it
+				 */
 				/* assumption task[1] is always init */
-				(void) send_sig(SIGCHLD, task[1], 1);
+				(void)send_sig(SIGCHLD, task[1], 1);
+			}
 		}
-	for (i=0 ; i<NR_OPEN ; i++)
+	}
+
+	for (i = 0; i < NR_OPEN; i++) {
 		if (current->filp[i])
 			sys_close(i);
+	}
+
 	iput(current->pwd);
-	current->pwd=NULL;
+	current->pwd = NULL;
 	iput(current->root);
-	current->root=NULL;
+	current->root = NULL;
 	iput(current->executable);
-	current->executable=NULL;
+	current->executable = NULL;
+
 	if (current->leader && current->tty >= 0)
 		tty_table[current->tty].pgrp = 0;
 	if (last_task_used_math == current)
 		last_task_used_math = NULL;
 	if (current->leader)
 		kill_session();
+
 	current->state = TASK_ZOMBIE;
 	current->exit_code = code;
 	tell_father(current->father);

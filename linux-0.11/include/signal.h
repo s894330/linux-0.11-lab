@@ -9,29 +9,36 @@ typedef unsigned int sigset_t;		/* 32 bits */
 #define _NSIG             32
 #define NSIG		_NSIG
 
-#define SIGHUP		 1
-#define SIGINT		 2
-#define SIGQUIT		 3
-#define SIGILL		 4
-#define SIGTRAP		 5
-#define SIGABRT		 6
+#define SIGHUP		 1	/* Hangup detected on controlling terminal */
+#define SIGINT		 2	/* Interrupt from keyboard */
+#define SIGQUIT		 3	/* Quit from keyboard */
+#define SIGILL		 4	/* Illegal Instruction */
+#define SIGTRAP		 5	/* used as a mechanism for a debugger to be
+				 * notified when the process it's debugging hits
+				 * a breakpoint
+				 */
+#define SIGABRT		 6	/* Abort signal from abort() */
 #define SIGIOT		 6
 #define SIGUNUSED	 7
-#define SIGFPE		 8
-#define SIGKILL		 9
-#define SIGUSR1		10
-#define SIGSEGV		11
-#define SIGUSR2		12
-#define SIGPIPE		13
-#define SIGALRM		14
-#define SIGTERM		15
-#define SIGSTKFLT	16
-#define SIGCHLD		17
-#define SIGCONT		18
-#define SIGSTOP		19
-#define SIGTSTP		20
-#define SIGTTIN		21
-#define SIGTTOU		22
+#define SIGFPE		 8	/* Floating point exception */
+#define SIGKILL		 9	/* Kill signal */
+#define SIGUSR1		10	/* User-defined signal 1 */
+#define SIGSEGV		11	/* Invalid memory reference */
+#define SIGUSR2		12	/* User-defined signal 2 */
+#define SIGPIPE		13	/* Broken pipe: write to pipe with no readers */
+#define SIGALRM		14	/* Timer signal from alarm() */
+#define SIGTERM		15	/* Termination signal */
+#define SIGSTKFLT	16	/* Stack fault on coprocessor (unused).
+				 * Since the x86 coprocessor stack cannot fault,
+				 * Only explicit generation (by kill() or 
+				 * raise()) could cause it.
+				 */
+#define SIGCHLD		17	/* Child stopped or terminated */
+#define SIGCONT		18	/* Continue if stopped */
+#define SIGSTOP		19	/*  Stop process */
+#define SIGTSTP		20	/* Stop typed at terminal */
+#define SIGTTIN		21	/* Terminal input for background process */
+#define SIGTTOU		22	/* Terminal output for background process */
 
 /* Ok, I haven't implemented sigactions, but trying to keep headers POSIX */
 #define SA_NOCLDSTOP	1

@@ -338,32 +338,36 @@ static struct m_inode *dir_namei(const char *pathname, int *namelen,
  * Open, link etc use their own routines, but this is enough for things
  * like 'chmod' etc.
  */
-struct m_inode * namei(const char * pathname)
+struct m_inode *namei(const char *pathname)
 {
-	const char * basename;
-	int inr,dev,namelen;
-	struct m_inode * dir;
-	struct buffer_head * bh;
-	struct dir_entry * de;
+	const char *basename;
+	int inr, dev, namelen;
+	struct m_inode *dir;
+	struct buffer_head *bh;
+	struct dir_entry *de;
 
-	if (!(dir = dir_namei(pathname,&namelen,&basename)))
+	if (!(dir = dir_namei(pathname, &namelen, &basename)))
 		return NULL;
 	if (!namelen)			/* special case: '/usr/' etc */
 		return dir;
-	bh = find_entry(&dir,basename,namelen,&de);
+
+	bh = find_entry(&dir, basename, namelen, &de);
 	if (!bh) {
 		iput(dir);
 		return NULL;
 	}
+
 	inr = de->inode_nr;
 	dev = dir->i_dev;
 	brelse(bh);
 	iput(dir);
-	dir=iget(dev,inr);
+
+	dir = iget(dev, inr);
 	if (dir) {
-		dir->i_atime=CURRENT_TIME;
-		dir->i_dirt=1;
+		dir->i_atime = CURRENT_TIME;
+		dir->i_dirt = 1;
 	}
+
 	return dir;
 }
 

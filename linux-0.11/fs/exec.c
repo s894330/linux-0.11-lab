@@ -70,16 +70,18 @@ static unsigned long * create_tables(char * p,int argc,int envc)
 }
 
 /*
- * count() counts the number of arguments/envelopes
+ * count() counts the number of arguments/envelopes, the last item of argv/envp
+ * is NULL
  */
-static int count(char ** argv)
+static int count(char **argv)
 {
-	int i=0;
-	char ** tmp;
+	int i = 0;
+	char **tmp;
 
-	if ((tmp = argv))
-		while (get_fs_long((unsigned long *) (tmp++)))
+	if ((tmp = argv)) {
+		while (get_fs_long((unsigned long *)(tmp++)))
 			i++;
+	}
 
 	return i;
 }
@@ -179,25 +181,29 @@ static unsigned long change_ldt(unsigned long text_size,unsigned long * page)
 /*
  * 'do_execve()' executes a new program.
  */
-int do_execve(unsigned long * eip,long tmp,char * filename,
-	char ** argv, char ** envp)
+int do_execve(unsigned long *eip, long tmp, char *filename, char **argv,
+	char **envp)
 {
-	struct m_inode * inode;
-	struct buffer_head * bh;
+	struct m_inode *inode;
+	struct buffer_head *bh;
 	struct exec ex;
 	unsigned long page[MAX_ARG_PAGES];
-	int i,argc,envc;
+	int i, argc, envc;
 	int e_uid, e_gid;
 	int retval;
 	int sh_bang = 0;
-	unsigned long p=PAGE_SIZE*MAX_ARG_PAGES-4;
+	unsigned long p = PAGE_SIZE * MAX_ARG_PAGES - 4;
 
+	/* check caller's cs */
 	if ((0xffff & eip[1]) != 0x000f)
 		panic("execve called from supervisor mode");
-	for (i=0 ; i<MAX_ARG_PAGES ; i++)	/* clear page-table */
-		page[i]=0;
-	if (!(inode=namei(filename)))		/* get executables inode */
+
+	for (i = 0; i < MAX_ARG_PAGES; i++)	/* clear page-table */
+		page[i] = 0;
+
+	if (!(inode = namei(filename)))		/* get executables inode */
 		return -ENOENT;
+
 	argc = count(argv);
 	envc = count(envp);
 	
@@ -206,23 +212,33 @@ restart_interp:
 		retval = -EACCES;
 		goto exec_error2;
 	}
+
 	i = inode->i_mode;
 	e_uid = (i & S_ISUID) ? inode->i_uid : current->euid;
 	e_gid = (i & S_ISGID) ? inode->i_gid : current->egid;
+
 	if (current->euid == inode->i_uid)
 		i >>= 6;
 	else if (current->egid == inode->i_gid)
 		i >>= 3;
+
+	/* check if has right to execute */
 	if (!(i & 1) &&
-	    !((inode->i_mode & 0111) && suser())) {
+		!((inode->i_mode & 0111) && suser())) {
 		retval = -ENOEXEC;
 		goto exec_error2;
 	}
-	if (!(bh = bread(inode->i_dev,inode->i_zone[0]))) {
+
+	/* read first block data of file */
+	if (!(bh = bread(inode->i_dev, inode->i_zone[0]))) {
 		retval = -EACCES;
 		goto exec_error2;
 	}
-	ex = *((struct exec *) bh->b_data);	/* read exec-header */
+
+	/* read exec-header */
+	ex = *((struct exec *)bh->b_data);
+
+	/* check if is script file */
 	if ((bh->b_data[0] == '#') && (bh->b_data[1] == '!') && (!sh_bang)) {
 		/*
 		 * This section does the #! interpretation.
@@ -295,13 +311,17 @@ restart_interp:
 		set_fs(old_fs);
 		goto restart_interp;
 	}
+
 	brelse(bh);
+
+	/* linux-0.11 only support ZMAGIC executable file format */
 	if (N_MAGIC(ex) != ZMAGIC || ex.a_trsize || ex.a_drsize ||
-		ex.a_text+ex.a_data+ex.a_bss>0x3000000 ||
-		inode->i_size < ex.a_text+ex.a_data+ex.a_syms+N_TXTOFF(ex)) {
+		ex.a_text + ex.a_data + ex.a_bss > 0x3000000 ||
+		inode->i_size < ex.a_text + ex.a_data + ex.a_syms + N_TXTOFF(ex)) {
 		retval = -ENOEXEC;
 		goto exec_error2;
 	}
+
 	if (N_TXTOFF(ex) != BLOCK_SIZE) {
 		printk("%s: N_TXTOFF != BLOCK_SIZE. See a.out.h.", filename);
 		retval = -ENOEXEC;
@@ -347,7 +367,7 @@ restart_interp:
 exec_error2:
 	iput(inode);
 exec_error1:
-	for (i=0 ; i<MAX_ARG_PAGES ; i++)
+	for (i = 0; i < MAX_ARG_PAGES; i++)
 		free_page(page[i]);
 	return(retval);
 }

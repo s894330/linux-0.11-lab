@@ -5,13 +5,13 @@
 
 struct exec {
   unsigned long a_magic;	/* Use macros N_MAGIC, etc for access */
-  unsigned a_text;		/* length of text, in bytes */
-  unsigned a_data;		/* length of data, in bytes */
-  unsigned a_bss;		/* length of uninitialized data area for file, in bytes */
-  unsigned a_syms;		/* length of symbol table data in file, in bytes */
-  unsigned a_entry;		/* start address */
-  unsigned a_trsize;		/* length of relocation info for text, in bytes */
-  unsigned a_drsize;		/* length of relocation info for data, in bytes */
+  unsigned int a_text;		/* length of text, in bytes */
+  unsigned int a_data;		/* length of data, in bytes */
+  unsigned int a_bss;		/* length of uninitialized data area for file, in bytes */
+  unsigned int a_syms;		/* length of symbol table data in file, in bytes */
+  unsigned int a_entry;		/* start address */
+  unsigned int a_trsize;	/* length of relocation info for text, in bytes */
+  unsigned int a_drsize;	/* length of relocation info for data, in bytes */
 };
 
 #ifndef N_MAGIC
@@ -37,11 +37,12 @@ struct exec {
  (N_MAGIC(x) != OMAGIC && N_MAGIC(x) != NMAGIC		\
   && N_MAGIC(x) != ZMAGIC)
 
-#define _N_HDROFF(x) (SEGMENT_SIZE - sizeof (struct exec))
+#define _N_HDROFF(x) (SEGMENT_SIZE - sizeof(struct exec))
 
 #ifndef N_TXTOFF
 #define N_TXTOFF(x) \
- (N_MAGIC(x) == ZMAGIC ? _N_HDROFF((x)) + sizeof (struct exec) : sizeof (struct exec))
+	(N_MAGIC(x) == ZMAGIC ? \
+	 _N_HDROFF((x)) + sizeof(struct exec) : sizeof(struct exec))
 #endif
 
 #ifndef N_DATOFF

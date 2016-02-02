@@ -103,53 +103,66 @@ static int count(char **argv)
  * it is expensive to load a segment register, we try to avoid calling
  * set_fs() unless we absolutely have to.
  */
-static unsigned long copy_strings(int argc,char ** argv,unsigned long *page,
-		unsigned long p, int from_kmem)
+static unsigned long copy_strings(int argc, char **argv, unsigned long *page,
+	unsigned long p, int from_kmem)
 {
-	char *tmp, *pag=NULL;
+	char *tmp, *pag = NULL;
 	int len, offset = 0;
 	unsigned long old_fs, new_fs;
 
 	if (!p)
 		return 0;	/* bullet-proofing */
+
 	new_fs = get_ds();
 	old_fs = get_fs();
-	if (from_kmem==2)
+
+	if (from_kmem == 2)
 		set_fs(new_fs);
+
 	while (argc-- > 0) {
 		if (from_kmem == 1)
 			set_fs(new_fs);
-		if (!(tmp = (char *)get_fs_long(((unsigned long *)argv)+argc)))
+
+		tmp = (char *)get_fs_long(((unsigned long *)argv) + argc);
+		if (!tmp)
 			panic("argc is wrong");
+
 		if (from_kmem == 1)
 			set_fs(old_fs);
-		len=0;		/* remember zero-padding */
+
+		len = 0;		/* remember zero-padding */
 		do {
 			len++;
 		} while (get_fs_byte(tmp++));
-		if (p-len < 0) {	/* this shouldn't happen - 128kB */
+
+		if (p - len < 0) {	/* this shouldn't happen - 128kB */
 			set_fs(old_fs);
 			return 0;
 		}
+
 		while (len) {
 			--p; --tmp; --len;
 			if (--offset < 0) {
 				offset = p % PAGE_SIZE;
-				if (from_kmem==2)
+				if (from_kmem == 2)
 					set_fs(old_fs);
-				if (!(pag = (char *) page[p/PAGE_SIZE]) &&
-				    !(pag = (char *) (page[p/PAGE_SIZE] =
+
+				if (!(pag = (char *)page[p / PAGE_SIZE]) &&
+					!(pag = (char *)(page[p / PAGE_SIZE] =
 				      get_free_page()))) 
 					return 0;
-				if (from_kmem==2)
+
+				if (from_kmem == 2)
 					set_fs(new_fs);
 
 			}
 			*(pag + offset) = get_fs_byte(tmp);
 		}
 	}
-	if (from_kmem==2)
+
+	if (from_kmem == 2)
 		set_fs(old_fs);
+
 	return p;
 }
 
@@ -238,7 +251,7 @@ restart_interp:
 	/* read exec-header */
 	ex = *((struct exec *)bh->b_data);
 
-	/* check if is script file */
+	/* check if is script file(begin with #!) */
 	if ((bh->b_data[0] == '#') && (bh->b_data[1] == '!') && (!sh_bang)) {
 		/*
 		 * This section does the #! interpretation.
@@ -316,7 +329,7 @@ restart_interp:
 
 	/* linux-0.11 only support ZMAGIC executable file format */
 	if (N_MAGIC(ex) != ZMAGIC || ex.a_trsize || ex.a_drsize ||
-		ex.a_text + ex.a_data + ex.a_bss > 0x3000000 ||
+		ex.a_text + ex.a_data + ex.a_bss > 0x3000000 ||	/* len > 50MB */
 		inode->i_size < ex.a_text + ex.a_data + ex.a_syms + N_TXTOFF(ex)) {
 		retval = -ENOEXEC;
 		goto exec_error2;
@@ -327,20 +340,24 @@ restart_interp:
 		retval = -ENOEXEC;
 		goto exec_error2;
 	}
+
 	if (!sh_bang) {
-		p = copy_strings(envc,envp,page,p,0);
-		p = copy_strings(argc,argv,page,p,0);
+		p = copy_strings(envc, envp, page, p, 0);
+		p = copy_strings(argc, argv, page, p, 0);
 		if (!p) {
 			retval = -ENOMEM;
 			goto exec_error2;
 		}
 	}
-/* OK, This is the point of no return */
+	
+	/* OK, This is the point of no return */
 	if (current->executable)
 		iput(current->executable);
 	current->executable = inode;
-	for (i=0 ; i<32 ; i++)
-		current->sigaction[i].sa_handler = NULL;
+	for (i=0 ; i<32 ; i++) {
+		if (current->sigaction[i].sa_handler != SIG_IGN)
+			current->sigaction[i].sa_handler = NULL;
+	}
 	for (i=0 ; i<NR_OPEN ; i++)
 		if ((current->close_on_exec>>i)&1)
 			sys_close(i);

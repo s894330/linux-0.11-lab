@@ -19,10 +19,10 @@ CPP	+= -Iinclude
 #ROOT_DEV= 021d	# FLOPPY B
 #ROOT_DEV= 0301	# hd1
 
-ARCHIVES=kernel/kernel.o mm/mm.o fs/fs.o
-DRIVERS =kernel/blk_drv/blk_drv.a kernel/chr_drv/chr_drv.a
-MATH	=kernel/math/math.a
-LIBS	=lib/lib.a
+ARCHIVES= kernel/kernel.o mm/mm.o fs/fs.o
+DRIVERS	= kernel/blk_drv/blk_drv.a kernel/chr_drv/chr_drv.a
+MATH	= kernel/math/math.a
+LIBS	= lib/lib.a
 
 .c.s:
 	@$(CC) $(CFLAGS) -S -o $*.s $<

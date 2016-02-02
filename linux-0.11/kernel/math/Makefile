@@ -12,15 +12,13 @@ CFLAGS	+= -I../../include
 CPP	+= -I../../include
 
 .c.s:
-	@$(CC) $(CFLAGS) \
-	-S -o $*.s $<
+	@$(CC) $(CFLAGS) -S -o $*.s $<
 .s.o:
 	@$(AS) -o $*.o $<
 .c.o:
-	@$(CC) $(CFLAGS) \
-	-c -o $*.o $<
+	@$(CC) $(CFLAGS) -c -o $*.o $<
 
-OBJS  = math_emulate.o
+OBJS	= math_emulate.o
 
 math.a: $(OBJS)
 	@$(AR) rcs math.a $(OBJS)

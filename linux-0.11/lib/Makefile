@@ -12,16 +12,14 @@ CFLAGS	+= -I../include
 CPP	+= -I../include
 
 .c.s:
-	@$(CC) $(CFLAGS) \
-	-S -o $*.s $<
+	@$(CC) $(CFLAGS) -S -o $*.s $<
 .s.o:
 	@$(AS) -o $*.o $<
 .c.o:
-	@$(CC) $(CFLAGS) \
-	-c -o $*.o $<
+	@$(CC) $(CFLAGS) -c -o $*.o $<
 
-OBJS  = ctype.o _exit.o open.o close.o errno.o write.o dup.o setsid.o \
-	execve.o wait.o string.o malloc.o
+OBJS	= ctype.o _exit.o open.o close.o errno.o write.o dup.o setsid.o \
+	  execve.o wait.o string.o malloc.o
 
 lib.a: $(OBJS)
 	@$(AR) rcs lib.a $(OBJS)

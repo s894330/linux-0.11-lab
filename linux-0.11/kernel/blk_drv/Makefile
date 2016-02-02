@@ -18,7 +18,7 @@ CPP	+= -I../../include
 .c.o:
 	@$(CC) $(CFLAGS) -c -o $*.o $<
 
-OBJS  = ll_rw_blk.o floppy.o hd.o ramdisk.o
+OBJS	= ll_rw_blk.o floppy.o hd.o ramdisk.o
 
 # options for ar
 #   r: Insert the files into archive, any previously existing members will be

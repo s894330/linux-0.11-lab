@@ -188,9 +188,17 @@ void init(void)
 	int pid, stat;
 
 	setup((void *)&drive_info);
-	open("/dev/tty0", O_RDWR, 0);
-	dup(0);	/* duplicate fd 0 to fd 1(stdout) */
-	dup(0);	/* duplicate fd 0 to fd 2(stderr) */
+	/* 
+	 * cast unused return value to void is to explicitly show other
+	 * "developers" that you know this function returns but you're
+	 * explicitly ignoring it.
+	 *
+	 * cast to void is costless. It is only information for compiler how to
+	 * treat it
+	 */
+	(void)open("/dev/tty0", O_RDWR, 0);
+	(void)dup(0);	/* duplicate fd 0 to fd 1(stdout) */
+	(void)dup(0);	/* duplicate fd 0 to fd 2(stderr) */
 	printf("%d buffer_head = %d bytes buffer space\n", NR_BUFFERS,
 		NR_BUFFERS * BLOCK_SIZE);
 	printf("Free mem: %d bytes\n", memory_end - main_memory_start);
@@ -209,6 +217,7 @@ void init(void)
 			/* nothing */;
 	}
 
+	/* child process pid 2 has died, re-create it */
 	while (1) {
 		if ((pid = fork()) < 0) {
 			printf("Fork failed in init\n");
@@ -220,9 +229,9 @@ void init(void)
 			close(1);
 			close(2);
 			setsid();
-			open("/dev/tty0", O_RDWR, 0);
-			dup(0);
-			dup(0);
+			(void)open("/dev/tty0", O_RDWR, 0);
+			(void)dup(0);
+			(void)dup(0);
 			_exit(execve("/bin/sh", argv, envp));
 		}
 

@@ -207,10 +207,11 @@ int sys_setsid(void)
 {
 	if (current->leader && !suser())
 		return -EPERM;
+
 	current->leader = 1;
 	current->session = current->pgrp = current->pid;
 	current->tty = -1;
-	return current->pgrp;
+	return current->session;
 }
 
 int sys_uname(struct utsname * name)

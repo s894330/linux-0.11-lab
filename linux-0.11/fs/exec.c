@@ -43,29 +43,36 @@ extern int sys_close(int fd);
  * memory and creates the pointer tables from them, and puts their
  * addresses on the "stack", returning the new stack pointer value.
  */
-static unsigned long * create_tables(char * p,int argc,int envc)
+static unsigned long *create_tables(char *p, int argc, int envc)
 {
-	unsigned long *argv,*envp;
-	unsigned long * sp;
+	unsigned long *argv, *envp;
+	unsigned long *sp;
 
-	sp = (unsigned long *) (0xfffffffc & (unsigned long) p);
-	sp -= envc+1;
+	/* set sp to the last param stack address */
+	sp = (unsigned long *)(0xfffffffc & (unsigned long)p);
+	sp -= envc + 1; /* 1 is the place of <NULL> char */
 	envp = sp;
-	sp -= argc+1;
+	sp -= argc + 1;	/* 1 is the place of <NULL> char */
 	argv = sp;
-	put_fs_long((unsigned long)envp,--sp);
-	put_fs_long((unsigned long)argv,--sp);
-	put_fs_long((unsigned long)argc,--sp);
-	while (argc-->0) {
-		put_fs_long((unsigned long) p,argv++);
-		while (get_fs_byte(p++)) /* nothing */ ;
+
+	put_fs_long((unsigned long)envp, --sp);
+	put_fs_long((unsigned long)argv, --sp);
+	put_fs_long((unsigned long)argc, --sp);
+
+	while (argc-- > 0) {
+		put_fs_long((unsigned long)p, argv++);
+		while (get_fs_byte(p++))
+			/* nothing */ ;
 	}
-	put_fs_long(0,argv);
-	while (envc-->0) {
-		put_fs_long((unsigned long) p,envp++);
-		while (get_fs_byte(p++)) /* nothing */ ;
+	put_fs_long(0, argv);	/* add <NULL> char */
+
+	while (envc-- > 0) {
+		put_fs_long((unsigned long)p, envp++);
+		while (get_fs_byte(p++))
+			/* nothing */ ;
 	}
-	put_fs_long(0,envp);
+	put_fs_long(0, envp);	/* add <NULL> char */
+
 	return sp;
 }
 
@@ -166,28 +173,33 @@ static unsigned long copy_strings(int argc, char **argv, unsigned long *page,
 	return p;
 }
 
-static unsigned long change_ldt(unsigned long text_size,unsigned long * page)
+static unsigned long change_ldt(unsigned long text_size, unsigned long *page)
 {
-	unsigned long code_limit,data_limit,code_base,data_base;
+	unsigned long code_limit, data_limit, code_base, data_base;
 	int i;
 
-	code_limit = text_size+PAGE_SIZE -1;
+	code_limit = text_size + PAGE_SIZE -1;
 	code_limit &= 0xFFFFF000;
-	data_limit = 0x4000000;
+	data_limit = 0x4000000;	/* 64MB */
+
 	code_base = get_base(current->ldt[1]);
 	data_base = code_base;
-	set_base(current->ldt[1],code_base);
-	set_limit(current->ldt[1],code_limit);
-	set_base(current->ldt[2],data_base);
-	set_limit(current->ldt[2],data_limit);
-/* make sure fs points to the NEW data segment */
-	__asm__("pushl $0x17; pop %%fs"::);
+
+	set_base(current->ldt[1], code_base);
+	set_limit(current->ldt[1], code_limit);
+	set_base(current->ldt[2], data_base);
+	set_limit(current->ldt[2], data_limit);
+
+	/* make sure fs points to the NEW data segment */
+	__asm__("pushl $0x17; pop %%fs":);
+
 	data_base += data_limit;
-	for (i=MAX_ARG_PAGES-1 ; i>=0 ; i--) {
+	for (i = MAX_ARG_PAGES - 1; i >= 0; i--) {
 		data_base -= PAGE_SIZE;
 		if (page[i])
-			put_page(page[i],data_base);
+			put_page(page[i], data_base);
 	}
+
 	return data_limit;
 }
 
@@ -354,37 +366,53 @@ restart_interp:
 	if (current->executable)
 		iput(current->executable);
 	current->executable = inode;
-	for (i=0 ; i<32 ; i++) {
+
+	for (i = 0; i < NSIG; i++) {
 		if (current->sigaction[i].sa_handler != SIG_IGN)
 			current->sigaction[i].sa_handler = NULL;
 	}
-	for (i=0 ; i<NR_OPEN ; i++)
-		if ((current->close_on_exec>>i)&1)
+
+	for (i = 0; i < NR_OPEN; i++) {
+		if ((current->close_on_exec >> i) & 1)
 			sys_close(i);
+	}
+
 	current->close_on_exec = 0;
-	free_page_tables(get_base(current->ldt[1]),get_limit(0x0f));
-	free_page_tables(get_base(current->ldt[2]),get_limit(0x17));
+
+	free_page_tables(get_base(current->ldt[1]), get_limit(0x0f));
+	free_page_tables(get_base(current->ldt[2]), get_limit(0x17));
+
 	if (last_task_used_math == current)
 		last_task_used_math = NULL;
 	current->used_math = 0;
-	p += change_ldt(ex.a_text,page)-MAX_ARG_PAGES*PAGE_SIZE;
-	p = (unsigned long) create_tables((char *)p,argc,envc);
+
+	p += change_ldt(ex.a_text, page) - MAX_ARG_PAGES * PAGE_SIZE;
+	p = (unsigned long)create_tables((char *)p, argc, envc);
+
 	current->brk = ex.a_bss +
 		(current->end_data = ex.a_data +
 		(current->end_code = ex.a_text));
 	current->start_stack = p & 0xfffff000;
 	current->euid = e_uid;
 	current->egid = e_gid;
-	i = ex.a_text+ex.a_data;
-	while (i&0xfff)
-		put_fs_byte(0,(char *) (i++));
+
+	/* 
+	 * if code + data length not align to page size(4KB), fill 0 to the rest
+	 */
+	i = ex.a_text + ex.a_data;
+	while (i & 0xfff)
+		put_fs_byte(0, (char *)(i++));
+
 	eip[0] = ex.a_entry;		/* eip, magic happens :-) */
-	eip[3] = p;			/* stack pointer */
+	eip[3] = p;			/* esp, stack pointer */
+
 	return 0;
+
 exec_error2:
 	iput(inode);
 exec_error1:
 	for (i = 0; i < MAX_ARG_PAGES; i++)
 		free_page(page[i]);
-	return(retval);
+
+	return retval;
 }

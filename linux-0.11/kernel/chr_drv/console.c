@@ -41,7 +41,7 @@
 #define ORIG_VIDEO_PAGE		(*(unsigned short *)0x90004)
 #define ORIG_VIDEO_MODE		((*(unsigned short *)0x90006) & 0xff)
 #define ORIG_VIDEO_COLS 	(((*(unsigned short *)0x90006) & 0xff00) >> 8)
-#define ORIG_VIDEO_LINES	(25)
+#define ORIG_VIDEO_ROWS		(25)
 #define ORIG_VIDEO_EGA_AX	(*(unsigned short *)0x90008)
 #define ORIG_VIDEO_EGA_BX	(*(unsigned short *)0x9000a)
 #define ORIG_VIDEO_EGA_CX	(*(unsigned short *)0x9000c)
@@ -58,7 +58,7 @@ extern void keyboard_interrupt(void);
 static unsigned char	video_type;	    /* Type of display being used   */
 static unsigned long	video_column_nrs;  /* Number of text columns	    */
 static unsigned long	video_size_per_row; /* Bytes per row		    */
-static unsigned long	video_line_nrs;    /* Number of test lines	    */
+static unsigned long	video_row_nrs;    /* Number of test lines	    */
 static unsigned char	video_page;	    /* Initial video page	    */
 static unsigned long	video_mem_start;    /* Start of video RAM	    */
 static unsigned long	video_mem_end;	    /* End of video RAM (sort of)   */
@@ -67,7 +67,7 @@ static unsigned short	video_port_val;	    /* Video register value port    */
 static unsigned short	video_erase_char;   /* Char+Attrib to erase with    */
 
 static unsigned long	origin;		/* Used for EGA/VGA fast scroll	*/
-static unsigned long	scr_end;	/* Used for EGA/VGA fast scroll	*/
+static unsigned long	scroll_end;	/* Used for EGA/VGA fast scroll	*/
 static unsigned long	pos;
 static unsigned long	x, y;
 static unsigned long	top, bottom;
@@ -84,10 +84,10 @@ static void sysbeep(void);
  */
 #define RESPONSE "\033[?1;2c"
 
-/* NOTE! gotoxy thinks x==video_column_nrs is ok */
+/* NOTE! gotoxy thinks x == video_column_nrs is ok */
 static inline void gotoxy(unsigned int new_x, unsigned int new_y)
 {
-	if (new_x > video_column_nrs || new_y >= video_line_nrs)
+	if (new_x > video_column_nrs || new_y >= video_row_nrs)
 		return;
 
 	x = new_x;
@@ -109,11 +109,11 @@ static void scrup(void)
 {
 	if (video_type == VIDEO_TYPE_EGAC || video_type == VIDEO_TYPE_EGAM)
 	{
-		if (!top && bottom == video_line_nrs) {
+		if (!top && bottom == video_row_nrs) {
 			origin += video_size_per_row;
 			pos += video_size_per_row;
-			scr_end += video_size_per_row;
-			if (scr_end > video_mem_end) {
+			scroll_end += video_size_per_row;
+			if (scroll_end > video_mem_end) {
 				__asm__("cld\n\t"
 					"rep\n\t"
 					"movsl\n\t"
@@ -121,9 +121,9 @@ static void scrup(void)
 					"rep\n\t"
 					"stosw"
 					::"a" (video_erase_char),
-					"c" ((video_line_nrs - 1) * video_column_nrs >> 1),
+					"c" ((video_row_nrs - 1) * video_column_nrs >> 1),
 					"D" (video_mem_start), "S" (origin));
-				scr_end -= origin-video_mem_start;
+				scroll_end -= origin-video_mem_start;
 				pos -= origin-video_mem_start;
 				origin = video_mem_start;
 			} else {
@@ -132,7 +132,7 @@ static void scrup(void)
 					"stosw"
 					::"a" (video_erase_char),
 					"c" (video_column_nrs),
-					"D" (scr_end-video_size_per_row));
+					"D" (scroll_end-video_size_per_row));
 			}
 			set_origin();
 		} else {
@@ -238,7 +238,7 @@ static void csi_J(int par)
 
 	switch (par) {
 		case 0:	/* erase from cursor to end of display */
-			count = (scr_end-pos)>>1;
+			count = (scroll_end-pos)>>1;
 			start = pos;
 			break;
 		case 1:	/* erase from start to cursor */
@@ -246,7 +246,7 @@ static void csi_J(int par)
 			start = origin;
 			break;
 		case 2: /* erase whole display */
-			count = video_column_nrs * video_line_nrs;
+			count = video_column_nrs * video_row_nrs;
 			start = origin;
 			break;
 		default:
@@ -349,7 +349,7 @@ static void insert_line(void)
 	oldtop=top;
 	oldbottom=bottom;
 	top=y;
-	bottom = video_line_nrs;
+	bottom = video_row_nrs;
 	scrdown();
 	top=oldtop;
 	bottom=oldbottom;
@@ -377,7 +377,7 @@ static void delete_line(void)
 	oldtop=top;
 	oldbottom=bottom;
 	top=y;
-	bottom = video_line_nrs;
+	bottom = video_row_nrs;
 	scrup();
 	top=oldtop;
 	bottom=oldbottom;
@@ -395,8 +395,8 @@ static void csi_at(unsigned int nr)
 
 static void csi_L(unsigned int nr)
 {
-	if (nr > video_line_nrs)
-		nr = video_line_nrs;
+	if (nr > video_row_nrs)
+		nr = video_row_nrs;
 	else if (!nr)
 		nr = 1;
 	while (nr--)
@@ -415,8 +415,8 @@ static void csi_P(unsigned int nr)
 
 static void csi_M(unsigned int nr)
 {
-	if (nr > video_line_nrs)
-		nr = video_line_nrs;
+	if (nr > video_row_nrs)
+		nr = video_row_nrs;
 	else if (!nr)
 		nr=1;
 	while (nr--)
@@ -601,8 +601,8 @@ void console_write(struct tty_struct *tty)
 				if (par[0])
 					par[0]--;
 				if (!par[1])
-					par[1] = video_line_nrs;
-				if (par[0] < par[1] && par[1] <= video_line_nrs) {
+					par[1] = video_row_nrs;
+				if (par[0] < par[1] && par[1] <= video_row_nrs) {
 					top = par[0];
 					bottom = par[1];
 				}
@@ -622,25 +622,28 @@ void console_write(struct tty_struct *tty)
 /*
  *  void console_init(void);
  *
- * This routine initalizes console interrupts, and does nothing
- * else. If you want the screen to clear, call tty_write with
- * the appropriate escape-sequece.
+ * This routine initalizes console interrupts, and does nothing else. If you
+ * want the screen to clear, call tty_write with the appropriate escape-sequece.
  *
  * Reads the information preserved by setup.s to determine the current display
  * type and sets everything accordingly.
  */
 void console_init(void)
 {
-	register unsigned char a;
+	register unsigned char tmp;
 	char *display_desc = "????";
 	char *display_ptr;
 
 	video_column_nrs = ORIG_VIDEO_COLS;
 	video_size_per_row = video_column_nrs * 2;
-	video_line_nrs = ORIG_VIDEO_LINES;
+	video_row_nrs = ORIG_VIDEO_ROWS;
 	video_page = ORIG_VIDEO_PAGE;
 	video_erase_char = 0x0720;  /* 0x20-ascii(<space>), 0x07-color prop */
 	
+	/* 
+	 * check monitor type.
+	 * both bochs and qemu are EGAc type - Nail 2016/2/4
+	 */
 	if (ORIG_VIDEO_MODE == 7) {	    /* Is this a monochrome display? */
 		video_mem_start = 0xb0000;
 		video_port_reg = 0x3b4;
@@ -671,30 +674,35 @@ void console_init(void)
 		}
 	}
 
-	/* Let the user known what kind of display driver we are using */
+	/* 
+	 * show monitor type at top right to let the user known what kind of
+	 * display driver we are using
+	 */
 	display_ptr = ((char *)video_mem_start) + video_size_per_row - 8;
 	while (*display_desc) {
-		*display_ptr++ = *display_desc++;
-		display_ptr++;	/* skip prop byte */
+		*display_ptr = *display_desc;
+
+		display_ptr += 2;	/* need skip prop byte */
+		display_desc++;
 	}
 	
 	/* Initialize the variables used for scrolling (mostly EGA/VGA)	*/
 	origin = video_mem_start;
-	scr_end	= video_mem_start + video_line_nrs * video_size_per_row;
+	scroll_end = video_mem_start + video_row_nrs * video_size_per_row;
 	top = 0;
-	bottom = video_line_nrs;
+	bottom = video_row_nrs;
 
-	/* update pos */
+	/* update pos, x: column, y: row*/
 	gotoxy(ORIG_X, ORIG_Y);
 
 	/* enable keyboard_interrupt (IRQ1) */
 	set_trap_gate(0x21, &keyboard_interrupt);
 	outb_p(inb_p(0x21) & 0xfd, 0x21);
 
-	/* reset keyboard */
-	a = inb_p(0x61);
-	outb_p(a | 0x80, 0x61);
-	outb(a, 0x61);
+	/* reset keyboard controller */
+	tmp = inb_p(0x61);
+	outb_p(tmp | 0x80, 0x61);
+	outb(tmp, 0x61);
 }
 /* from bsd-net-2: */
 

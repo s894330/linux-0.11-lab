@@ -327,6 +327,10 @@ void write_verify(unsigned long address)
 
 	pgt_addr = *((unsigned long *)((address >> 22) * 4));
 
+	/* 
+	 * if pgt_addr not exist, CPU will cause page not found error, thus
+	 * call do_no_page routine, so we can directly return
+	 */
 	if (!(pgt_addr & 1))
 		return;
 

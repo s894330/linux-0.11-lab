@@ -184,16 +184,20 @@ void do_reserved(long esp, long error_code)
 	die("reserved (15,17-47) error",esp,error_code);
 }
 
+/* 
+ * setup x86 CPU pre-defined interrupt number ISR and other number ISR
+ */
 void trap_init(void)
 {
 	int i;
 
+	/* register IRQ 0~16 ISR */
 	set_trap_gate(0, &divide_error);
 	set_trap_gate(1, &debug);
 	set_trap_gate(2, &nmi);
-	set_system_gate(3, &int3);	/* int3-5 can be called from all */
-	set_system_gate(4, &overflow);
-	set_system_gate(5, &bounds);
+	set_system_gate(3, &int3);	/* system gate is also trap gate, but */
+	set_system_gate(4, &overflow);	/* can be called from user process */
+	set_system_gate(5, &bounds);	/* trap gate can not do this */
 	set_trap_gate(6, &invalid_op);
 	set_trap_gate(7, &device_not_available);
 	set_trap_gate(8, &double_fault);
@@ -208,10 +212,18 @@ void trap_init(void)
 
 	for (i = 17; i < 48; i++)
 		set_trap_gate(i, &reserved);
-
-	set_trap_gate(45, &irq13);
-	outb_p(inb_p(0x21) & 0xfb, 0x21);   /* enable IRQ2 (connected with 8259A
-					     * slave chip */
-	outb(inb_p(0xa1) & 0xdf, 0xa1);	    /* enable IRQ13 (FPU error)*/
-	set_trap_gate(39, &parallel_interrupt);
+	
+	/* 
+	 * 0~31 interrupt number is reserved by x86 CPU.
+	 * number 32 = IRQ 0
+	 * number 33 = IRQ 1
+	 * ...
+	 * number 45 = IRQ 13
+	 * ...
+	 * and so on
+	 */
+	set_trap_gate(45, &irq13);  /* register IRQ13 ISR */
+	outb_p(inb_p(0x21) & 0xfb, 0x21);/* enable IRQ2 (connected with 8259A-2) */
+	outb(inb_p(0xa1) & 0xdf, 0xa1);	 /* enable IRQ13 (FPU(387) error)*/
+	set_trap_gate(39, &parallel_interrupt);	/* register IRQ 7 ISR*/
 }

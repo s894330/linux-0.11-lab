@@ -11,10 +11,10 @@
  * the fpu must be properly saved/resored. This hasn't been tested.
  */
 
-.globl divide_error,debug,nmi,int3,overflow,bounds,invalid_op
-.globl double_fault,coprocessor_segment_overrun
-.globl invalid_TSS,segment_not_present,stack_segment
-.globl general_protection,coprocessor_error,irq13,reserved
+.global divide_error, debug, nmi, int3, overflow, bounds, invalid_op
+.global double_fault, coprocessor_segment_overrun, invalid_TSS,
+.global segment_not_present, stack_segment, general_protection,
+.global coprocessor_error, irq13, reserved
 
 divide_error:
 	pushl $do_divide_error
@@ -29,15 +29,17 @@ no_error_code:
 	push %ds
 	push %es
 	push %fs
-	pushl $0		# "error code"
-	lea 44(%esp),%edx
-	pushl %edx
-	movl $0x10,%edx
-	mov %dx,%ds
-	mov %dx,%es
-	mov %dx,%fs
+
+	pushl $0		# push "error code" 0 into stack
+	lea 44(%esp), %edx	# fetch eip into edx
+	pushl %edx		# save original esp before into ISR to stack
+	movl $0x10, %edx	# change to kernel data segment
+	mov %dx, %ds
+	mov %dx, %es
+	mov %dx, %fs
 	call *%eax
-	addl $8,%esp
+	addl $8, %esp		# skip 2 param
+
 	pop %fs
 	pop %es
 	pop %ds

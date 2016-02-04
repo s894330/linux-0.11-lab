@@ -69,8 +69,8 @@ struct task_struct *task[NR_TASKS] = {&(init_task.task),};
 long user_stack[PAGE_SIZE >> 2];
 
 struct {
-    long *a;
-    short b;
+    long *a;	/* esp */
+    short b;	/* ss */
 } stack_start = {&user_stack[PAGE_SIZE >> 2], KERNEL_DATA_SEG};
 
 /*

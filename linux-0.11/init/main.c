@@ -73,7 +73,7 @@ extern long startup_time;
  * 
  * so we need transfer it
  */
-#define BCD_TO_BIN(val) ((val) = ((val) & 15) + ((val) >> 4) * 10)
+#define BCD_TO_BIN(val) ((val) = ((val) & 0x0f) + ((val) >> 4) * 10)
 
 static void time_init(void)
 {
@@ -86,7 +86,7 @@ static void time_init(void)
 		time.tm_mday = CMOS_READ(7);	/* 0x07      Day of Month */
 		time.tm_mon = CMOS_READ(8);	/* 0x08      Month */
 		time.tm_year = CMOS_READ(9);	/* 0x09      Year */
-	} while (time.tm_sec != CMOS_READ(0));
+	} while (CMOS_READ(0) != time.tm_sec);
 
 	BCD_TO_BIN(time.tm_sec);
 	BCD_TO_BIN(time.tm_min);

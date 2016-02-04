@@ -42,9 +42,10 @@ __asm__("movl %%eax, %%cr3"::"a" (0))
 /* these are not to be changed without changing head.s etc */
 #define LOW_MEM 0x100000
 #define PAGING_MEMORY (15 * 1024 * 1024)
-#define PAGING_PAGES (PAGING_MEMORY >> 12)
+#define TOTAL_PAGES (PAGING_MEMORY >> 12)
 #define MAP_NR(addr) (((addr) - LOW_MEM) >> 12)
 #define USED 100
+#define UNUSED 0
 
 #define CODE_SPACE(addr) ((((addr) + 4095) & ~4095) < \
 	current->start_code + current->end_code)
@@ -54,7 +55,7 @@ static long HIGH_MEMORY = 0;
 #define copy_page(from, to) \
 	__asm__("cld; rep; movsl"::"S" (from), "D" (to), "c" (1024))
 
-static unsigned char mem_map[PAGING_PAGES] = {0};
+static unsigned char memory_map[TOTAL_PAGES] = {0};
 
 /*
  * Get physical address of first (actually last :-) free page, and mark it
@@ -69,10 +70,10 @@ unsigned long get_free_page(void)
 	 */
 	register unsigned long __res;
 
-	/* get first unused page in mem_map[] and clean it, then return */
+	/* get first unused page in memory_map[] and clean it, then return */
 	__asm__("std; repne; scasb\n\t"	    /* repeat compare es:edi with al */
 		"jne 1f\n\t"
-		"movb $1, 1(%%edi)\n\t"	    /* set mem_map[edi+1] to 1 */
+		"movb $1, 1(%%edi)\n\t"	    /* set memory_map[edi+1] to 1 */
 		"sall $12, %%ecx\n\t"	    /* shift left, ecx * 4KB */
 		"addl %2, %%ecx\n\t"	    /* add memory base (LOW_MEM) */
 		"movl %%ecx, %%edx\n\t"	    /* edx = real physical mem addr */
@@ -82,8 +83,8 @@ unsigned long get_free_page(void)
 		"movl %%edx, %%eax\n\t"	    /* eax = addr of physical memory */
 		"1:cld"
 		:"=a" (__res)
-		:"0" (0), "i" (LOW_MEM), "c" (PAGING_PAGES),
-		"D" (mem_map + PAGING_PAGES - 1));
+		:"0" (0), "i" (LOW_MEM), "c" (TOTAL_PAGES),
+		"D" (memory_map + TOTAL_PAGES - 1));
 
 	return __res;
 }
@@ -101,11 +102,11 @@ void free_page(unsigned long addr)
 
 	addr -= LOW_MEM;
 	addr >>= 12;
-	if (mem_map[addr]) {
-		mem_map[addr]--;
+	if (memory_map[addr]) {
+		memory_map[addr]--;
 		return;
 	}
-	mem_map[addr] = 0;
+	memory_map[addr] = 0;
 	panic("trying to free free page");
 }
 
@@ -223,13 +224,13 @@ int copy_page_tables(unsigned long from, unsigned long to, long size)
 
 			/* 
 			 * if this_page > LOW_MEM, also mark from_page to read
-			 * only, and update mem_map[]
+			 * only, and update memory_map[]
 			 * */
 			if (this_page > LOW_MEM) {
 				*from_page_table = this_page;
 				this_page -= LOW_MEM;
 				this_page >>= 12;
-				mem_map[this_page]++;
+				memory_map[this_page]++;
 			}
 		}
 	}
@@ -253,8 +254,8 @@ unsigned long put_page(unsigned long page, unsigned long address)
 	if (page < LOW_MEM || page >= HIGH_MEMORY)
 		printk("Trying to put page %p at %p\n", page, address);
 
-	if (mem_map[(page - LOW_MEM) >> 12] != 1)
-		printk("mem_map disagrees with %p at %p\n", page, address);
+	if (memory_map[(page - LOW_MEM) >> 12] != 1)
+		printk("memory_map disagrees with %p at %p\n", page, address);
 
 	pdt_entry = (unsigned long *)((address >> 22) * 4);
 	if ((*pdt_entry) & 1) {
@@ -276,9 +277,9 @@ void un_wp_page(unsigned long *table_entry)
 {
 	unsigned long old_page, new_page;
 
-	/* if page is not shared (mem_map[] = 1), change property to R/W */
+	/* if page is not shared (memory_map[] = 1), change property to R/W */
 	old_page = 0xfffff000 & *table_entry;
-	if (old_page >= LOW_MEM && mem_map[MAP_NR(old_page)] == 1) {
+	if (old_page >= LOW_MEM && memory_map[MAP_NR(old_page)] == 1) {
 		*table_entry |= 2;
 		refresh_TLB();
 		return;
@@ -288,7 +289,7 @@ void un_wp_page(unsigned long *table_entry)
 		oom();
 
 	if (old_page >= LOW_MEM)
-		mem_map[MAP_NR(old_page)]--;
+		memory_map[MAP_NR(old_page)]--;
 
 	*table_entry = new_page | 7;
 	refresh_TLB();
@@ -399,7 +400,7 @@ static int try_to_share(unsigned long address, struct task_struct * p)
 	refresh_TLB();
 	phys_addr -= LOW_MEM;
 	phys_addr >>= 12;
-	mem_map[phys_addr]++;
+	memory_map[phys_addr]++;
 	return 1;
 }
 
@@ -467,26 +468,29 @@ void do_no_page(unsigned long error_code,unsigned long address)
 }
 
 /* 
- * initial mem_map[] array
- * mem_map[i] correspond one 4KB physical page, 0 means unused
- * > 0 means used
+ * initial memory_map[] array according to real physical memory size, each
+ * memory_map[i] correspond one 4KB physical page,
+ * 0 means unused, > 0 means used
  */
-void mem_init(long start_mem, long end_mem)
+void memory_init(long memory_start, long memory_end)
 {
 	int i;
 
-	HIGH_MEMORY = end_mem;
+	HIGH_MEMORY = memory_end;
 
-	for (i = 0; i < PAGING_PAGES; i++)
-		mem_map[i] = USED;
+	for (i = 0; i < TOTAL_PAGES; i++)
+		memory_map[i] = USED;
 
-	i = MAP_NR(start_mem);
-	end_mem -= start_mem;
-	end_mem >>= 12;
+	i = MAP_NR(memory_start);
+	memory_end -= memory_start;
+	memory_end >>= 12;
 
-	/* according phsical memory size to adjust mem_map[] */
-	while (end_mem-- > 0)
-		mem_map[i++] = 0;
+	/* according phsical memory size to adjust memory_map[i] value */
+	while (memory_end > 0) {
+		memory_map[i] = UNUSED;
+		memory_end--;
+		i++;
+	}
 }
 
 void calc_mem(void)
@@ -494,9 +498,9 @@ void calc_mem(void)
 	int i,j,k,free=0;
 	long * pg_tbl;
 
-	for(i=0 ; i<PAGING_PAGES ; i++)
-		if (!mem_map[i]) free++;
-	printk("%d pages free (of %d)\n\r",free,PAGING_PAGES);
+	for(i=0 ; i<TOTAL_PAGES ; i++)
+		if (!memory_map[i]) free++;
+	printk("%d pages free (of %d)\n\r",free,TOTAL_PAGES);
 	for(i=2 ; i<1024 ; i++) {
 		if (1&pg_dir[i]) {
 			pg_tbl=(long *) (0xfffff000 & pg_dir[i]);

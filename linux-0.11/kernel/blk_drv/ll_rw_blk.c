@@ -15,8 +15,8 @@
 #include "blk.h"
 
 /*
- * The request-struct contains all necessary data
- * to load a nr of sectors into memory
+ * The request-struct contains all necessary data to load nrs of sector into
+ * memory
  */
 struct request request[NR_REQUEST];
 
@@ -170,7 +170,7 @@ void ll_rw_block(int rw, struct buffer_head *bh)
 	make_request(major, rw, bh);
 }
 
-void blk_dev_init(void)
+void block_dev_init(void)
 {
 	int i;
 

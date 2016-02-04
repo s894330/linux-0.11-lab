@@ -48,8 +48,8 @@ static char printbuf[1024];
 
 extern int vsprintf();
 extern void init(void);
-extern void blk_dev_init(void);
-extern void chr_dev_init(void);
+extern void block_dev_init(void);
+extern void char_dev_init(void);
 extern void hd_init(void);
 extern void floppy_init(void);
 extern void memory_init(long start, long end);
@@ -135,8 +135,8 @@ void start_kernel(void)	/* This really IS void, no error here. */
 #endif
 	memory_init(memory_start, memory_end);
 	trap_init();
-	blk_dev_init();
-	chr_dev_init();
+	block_dev_init();
+	char_dev_init();
 	tty_init();
 	time_init();
 	sched_init();

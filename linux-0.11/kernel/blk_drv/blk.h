@@ -15,10 +15,9 @@
 #define NR_REQUEST	32
 
 /*
- * Ok, this is an expanded form so that we can use the same
- * request for paging requests when that is implemented. In
- * paging, 'bh' is NULL, and 'waiting' is used to wait for
- * read/write completion.
+ * Ok, this is an expanded form so that we can use the same request for paging
+ * requests when that is implemented. In paging, 'bh' is NULL, and 'waiting' is
+ * used to wait for read/write completion.
  */
 struct request {
 	int dev;		/* -1 if no request */

@@ -322,23 +322,17 @@ void do_wp_page(unsigned long error_code, unsigned long address)
 
 void write_verify(unsigned long address)
 {
-	unsigned long *pdt_entry;
-	unsigned long *pgt_entry;
+	unsigned long pgt_addr;
+	unsigned long page_addr;
 
-	pdt_entry = (unsigned long *)((address >> 22) * 4);
+	pgt_addr = *((unsigned long *)((address >> 22) * 4));
 
-	/* 
-	 * if pgt_entry not exist, CPU will cause page not found error, thus
-	 * call do_no_page routine, so we can directly return
-	 */
-	if (!(*pdt_entry & 1))
+	if (!(pgt_addr & 1))
 		return;
 
-	pgt_entry = (unsigned long *)
-		((*pdt_entry) & 0xfffff000) + (((address >> 12) & 0x3ff) * 4);
-
-	if ((3 & *pgt_entry) == 1)  /* non-writeable, present */
-		un_wp_page(pgt_entry);
+	page_addr = (pgt_addr & 0xfffff000) + ((address >> 12) & 0x3ff) * 4;
+	if ((*(unsigned long *)page_addr & 3) == 1)  /* non-writeable, present */
+		un_wp_page((unsigned long *)page_addr);
 	return;
 }
 

@@ -9,7 +9,7 @@
  *
  * This module implements the rs232 io functions
  *	void rs_write(struct tty_struct * queue);
- *	void rs_init(void);
+ *	void serial_init(void);
  * and all interrupts pertaining to serial IO.
  */
 
@@ -20,32 +20,33 @@
 
 #define WAKEUP_CHARS (TTY_BUF_SIZE/4)
 
-extern void rs1_interrupt(void);
-extern void rs2_interrupt(void);
+extern void serial1_interrupt(void);
+extern void serial2_interrupt(void);
 
-static void init(int port)
+/* set serial port property to 2400bps, 8N1 */
+static void init_serial_port(int port)
 {
 	outb_p(0x80, port + 3);	/* set DLAB of line control reg */
-	outb_p(0x30, port);	/* LS of divisor (48 -> 2400 bps */
+	outb_p(0x30, port);	/* LS of divisor (48 -> 2400 bps) */
 	outb_p(0x00, port + 1);	/* MS of divisor */
-	outb_p(0x03, port + 3);	/* reset DLAB and set 8bit data per transmit */
-	outb_p(0x0b, port + 4);	/* set DTR,RTS, OUT_2 */
-	outb_p(0x0d, port + 1);	/* enable all intrs but writes */
+	outb_p(0x03, port + 3);	/* 8 bits, no parity, one stop bit */
+	outb_p(0x0b, port + 4);	/* set DTR, RTS, OUT_2 */
+	outb_p(0x0d, port + 1);	/* enable all intrs except writes */
 	inb(port);	/* read data port to reset things (?) */
 }
 
-void rs_init(void)
+void serial_init(void)
 {
-	/* register tty1/tty2 ISR */
-	set_intr_gate(0x24, rs1_interrupt);
-	set_intr_gate(0x23, rs2_interrupt);
+	/* register tty1/tty2(IRQ4/IRQ3) ISR */
+	set_intr_gate(0x24, serial1_interrupt);
+	set_intr_gate(0x23, serial2_interrupt);
 
-	/* init tty1/tty2 property */
-	init(tty_table[1].read_q.data);
-	init(tty_table[2].read_q.data);
+	/* init tty1/tty2 serial port */
+	init_serial_port(tty_table[1].read_q.data);
+	init_serial_port(tty_table[2].read_q.data);
 
-	/* enable tty1 (IRQ4)/tty2 (IRQ3) interrupt */
-	outb(inb_p(0x21) & 0xe7,0x21);
+	/* enable tty1(IRQ4)/tty2(IRQ3) interrupt */
+	outb(inb_p(0x21) & 0xe7, 0x21);
 }
 
 /*

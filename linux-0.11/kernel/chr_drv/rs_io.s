@@ -11,7 +11,7 @@
  */
 
 .text
-.globl rs1_interrupt,rs2_interrupt
+.global serial1_interrupt, serial2_interrupt
 
 size	= 1024				/* must be power of two !
 					   and must match the value
@@ -30,12 +30,13 @@ startup	= 256		/* chars left in write queue when we restart it */
  * These are the actual interrupt routines. They look where
  * the interrupt is coming from, and take appropriate action.
  */
-.align 2
-rs1_interrupt:
+.align 4
+serial1_interrupt:
 	pushl $table_list+8
 	jmp rs_int
-.align 2
-rs2_interrupt:
+
+.align 4
+serial2_interrupt:
 	pushl $table_list+16
 rs_int:
 	pushl %edx

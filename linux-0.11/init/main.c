@@ -150,17 +150,19 @@ void start_kernel(void)	/* This really IS void, no error here. */
 	sti();
 	move_to_user_mode();
 
-	if (!fork()) {		/* we count on this going ok */
+	/* now we are under task0's user process context */
+	if (!fork())	/* we count on this going ok */
 		init();
-	}
-/*
- *   NOTE!!   For any other task 'pause()' would mean we have to get a
- * signal to awaken, but task0 is the sole exception (see 'schedule()')
- * as task 0 gets activated at every idle moment (when no other tasks
- * can run). For task0 'pause()' just means we go check if some other
- * task can run, and if not we return here.
- */
-	for(;;) pause();
+
+	/*
+	 * NOTE!! For any other task, 'pause()' would mean we have to get a
+	 * signal to awaken, but task0 is the sole exception (see 'schedule()')
+	 * as task 0 gets activated at every idle moment (when no other tasks
+	 * can run). For task0, 'pause()' just means we go check if some other
+	 * task can run, if there is no other task can run, we return here.
+	 */
+	for(;;)
+		pause();
 }
 
 static int printf(const char *fmt, ...)

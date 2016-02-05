@@ -465,9 +465,10 @@ void do_fd_request(void)
 
 void floppy_init(void)
 {
-	blk_dev[MAJOR_NR].request_fn = DEVICE_REQUEST;
+	/* setup floppy handler function */
+	blk_dev[MAJOR_NR].request_fn = DEVICE_REQUEST;	/* do_fd_request */
 
-	/* enable floppy interrupt */
+	/* enable floppy interrupt (IRQ6)*/
 	set_trap_gate(0x26, &floppy_interrupt);
 	outb(inb_p(0x21) & 0xbf, 0x21);
 }

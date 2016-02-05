@@ -412,7 +412,8 @@ void do_hd_request(void)
 
 void hd_init(void)
 {
-	blk_dev[MAJOR_NR].request_fn = DEVICE_REQUEST;
+	/* setup hd handler function */
+	blk_dev[MAJOR_NR].request_fn = DEVICE_REQUEST;	/* do_hd_request */
 
 	/* enable hd interrupt (IRQ14) */
 	set_intr_gate(0x2e, &hd_interrupt);

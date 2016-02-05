@@ -39,6 +39,7 @@ extern int tty_write(unsigned minor,char * buf,int count);
 
 typedef int (*fn_ptr)();
 
+/* 108byte */
 struct i387_struct {
 	long cwd;
 	long swd;
@@ -50,6 +51,7 @@ struct i387_struct {
 	long st_space[20];	/* 8*10 bytes for each FP-reg = 80 bytes */
 };
 
+/* 212byte */
 struct tss_struct {
 	long back_link;		/* 16 high bits zero */
 	long esp0;
@@ -77,15 +79,17 @@ struct tss_struct {
 	struct i387_struct i387;
 };
 
+/* 952byte */
 struct task_struct {
-/* these are hardcoded - don't touch */
+	/* these are hardcoded - don't touch */
 	long state;	/* -1 unrunnable, 0 runnable, >0 stopped */
 	long counter;
 	long priority;
 	long signal;
 	struct sigaction sigaction[32];
 	long blocked;	/* bitmap of masked signals */
-/* various fields */
+
+	/* various fields */
 	int exit_code;
 	unsigned long start_code, end_code, end_data, brk, start_stack;
 	long pid, father, pgrp, session, leader;
@@ -94,7 +98,8 @@ struct task_struct {
 	long alarm;
 	long utime, stime, cutime, cstime, start_time;
 	unsigned short used_math;
-/* file system info */
+
+	/* file system info */
 	int tty;		/* -1 if no tty, so it must be signed */
 	unsigned short umask;
 	struct m_inode *pwd;
@@ -102,99 +107,96 @@ struct task_struct {
 	struct m_inode *executable;
 	unsigned long close_on_exec;
 	struct file *filp[NR_OPEN];
-/* ldt for this task 0 - zero 1 - cs 2 - ds&ss */
+
+	/* ldt for this task, 0-NULL, 1-cs, 2-ds&ss */
 	struct descriptor_struct ldt[3];
-/* tss for this task */
+
+	/* tss for this task */
 	struct tss_struct tss;
 };
 
 /*
- *  INIT_TASK is used to set up the first task table, touch at
- * your own risk!. Base=0, limit=0x9ffff (=640kB)
+ *  INIT_TASK is used to set up the first task table, touch at your own risk!.
+ *  Base=0, limit=0x9ffff (=640kB)
  */
-#define INIT_TASK \
-{ \
-    .state = 0, \
-    .counter = 15, \
-    .priority = 15, \
-    .signal = 0, \
-    .sigaction = {{}}, \
-    .blocked = 0, \
-    .exit_code = 0, \
-    .start_code = 0, \
-    .end_code = 0, \
-    .end_data = 0, \
-    .brk = 0, \
-    .start_stack = 0, \
-    .pid = 0, \
-    .father = -1, \
-    .pgrp = 0, \
-    .session = 0, \
-    .leader = 0, \
-    .uid = 0, \
-    .euid = 0, \
-    .suid = 0, \
-    .gid = 0, \
-    .egid = 0, \
-    .sgid = 0, \
-    .alarm = 0, \
-    .utime = 0, \
-    .stime = 0, \
-    .cutime = 0, \
-    .cstime = 0, \
-    .start_time = 0, \
-    .used_math = 0, \
-    .tty = -1, \
-    .umask = 0022, \
-    .pwd = NULL, \
-    .root = NULL, \
-    .executable = NULL, \
-    .close_on_exec = 0, \
-    .filp = {NULL}, \
-    .ldt = { \
-	    {0, 0}, \
-	    /* len limit, property */ \
-	    {0x009f, 0x00c0fa00}, /* 640KB len, code seg. DPL 3 */ \
-	    {0x9f, 0xc0f200}, /* 640KB len, data seg. DPL 3 */ \
-    }, \
-    .tss = { \
-	    .back_link = 0, \
-	    /* 
-	     * TODO why esp0 set this value? but not set to a fixed variable,
-	     * just like user_stack[PAGE_SIZE >> 2], set esp0 to 
-	     * kernel_stack[PAGE_SIZE]?
-	     */ \
-	    .esp0 = PAGE_SIZE + (long)&init_task, \
-	    .ss0 = KERNEL_DATA_SEG, \
-	    .esp1 = 0, /* linux no use privilage 1 and 2 */ \
-	    .ss1 = 0, \
-	    .esp2 = 0, \
-	    .ss2 = 0, \
-	    .cr3 = (long)&pg_dir, \
-	    .eip = 0, \
-	    .eflags = 0, \
-	    .eax = 0, \
-	    .ecx = 0, \
-	    .edx = 0, \
-	    .ebx = 0, \
-	    .esp = 0, \
-	    .ebp = 0, \
-	    .esi = 0, \
-	    .edi = 0, \
-	    .es = TASK_DATA_SEG, \
-	    .cs = TASK_DATA_SEG, \
-	    .ss = TASK_DATA_SEG, \
-	    .ds = TASK_DATA_SEG, \
-	    .fs = TASK_DATA_SEG, \
-	    .gs = TASK_DATA_SEG, \
-	    .ldt = _LDT(0), \
-	    /* 
-	     * offset 32KB of TSS segment is the I/O permission map of
-	     * this task
-	     */ \
-	    .trace_bitmap = 0x80000000, \
-	    .i387 = {} \
-    }, \
+#define INIT_TASK { \
+	.state = 0, \
+	.counter = 15, \
+	.priority = 15, \
+	.signal = 0, \
+	.sigaction = {{}}, \
+	.blocked = 0, \
+	.exit_code = 0, \
+	.start_code = 0, \
+	.end_code = 0, \
+	.end_data = 0, \
+	.brk = 0, \
+	.start_stack = 0, \
+	.pid = 0, \
+	.father = -1, \
+	.pgrp = 0, \
+	.session = 0, \
+	.leader = 0, \
+	.uid = 0, \
+	.euid = 0, \
+	.suid = 0, \
+	.gid = 0, \
+	.egid = 0, \
+	.sgid = 0, \
+	.alarm = 0, \
+	.utime = 0, \
+	.stime = 0, \
+	.cutime = 0, \
+	.cstime = 0, \
+	.start_time = 0, \
+	.used_math = 0, \
+	.tty = -1, \
+	.umask = 0022, \
+	.pwd = NULL, \
+	.root = NULL, \
+	.executable = NULL, \
+	.close_on_exec = 0, \
+	.filp = {NULL}, \
+	.ldt = { \
+		{0, 0}, \
+		/* len limit, property */ \
+		{0x009f, 0x00c0fa00}, /* 640KB len, R/E code seg. DPL 3 */ \
+		{0x009f, 0x00c0f200}, /* 640KB len, R/W data seg. DPL 3 */ \
+	}, \
+	.tss = { \
+		.back_link = 0, \
+		.esp0 = (long)&init_task + PAGE_SIZE, \
+		.ss0 = KERNEL_DATA_SEG, \
+		.esp1 = 0, /* linux does not use privilage 1~2 */ \
+		.ss1 = 0, \
+		.esp2 = 0, \
+		.ss2 = 0, \
+		.cr3 = (long)&pg_dir, \
+		.eip = 0, \
+		.eflags = 0, \
+		.eax = 0, \
+		.ecx = 0, \
+		.edx = 0, \
+		.ebx = 0, \
+		.esp = 0, \
+		.ebp = 0, \
+		.esi = 0, \
+		.edi = 0, \
+		.es = TASK_DATA_SEG, \
+		.cs = TASK_DATA_SEG, \
+		.ss = TASK_DATA_SEG, \
+		.ds = TASK_DATA_SEG, \
+		.fs = TASK_DATA_SEG, \
+		.gs = TASK_DATA_SEG, \
+		.ldt = _LDT(0), \
+		/* 
+		 * TODO set offset 32KB from TSS segment start is the I/O
+		 *	permission map of this task, but why use 32KB? by self
+		 *	test, set 0 also work well
+		 */ \
+		.trace_bitmap = 0x80000000, \
+		.i387 = {} \
+	}, \
 }
 
 extern struct task_struct *task[NR_TASKS];

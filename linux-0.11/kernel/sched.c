@@ -50,6 +50,9 @@ extern void mem_use(void);
 extern int timer_interrupt(void);
 extern int system_call(void);
 
+/* 
+ * task_struct size is 952btye, stack is 4KB, so this union size is 4KB
+ */
 union task_union {
 	struct task_struct task;
 	char stack[PAGE_SIZE];

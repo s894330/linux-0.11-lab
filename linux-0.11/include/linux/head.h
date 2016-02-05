@@ -1,6 +1,7 @@
 #ifndef _HEAD_H
 #define _HEAD_H
 
+/* 8byte */
 typedef struct descriptor_struct {
 	unsigned long a,b;
 } descriptor_table[256];

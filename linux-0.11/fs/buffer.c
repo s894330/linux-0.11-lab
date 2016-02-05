@@ -26,11 +26,11 @@
 #include <asm/system.h>
 #include <asm/io.h>
 
-/* end variable is defined by ld, which specify the end of kernel code */
 extern int end;
 extern void put_super(int);
 extern void invalidate_inodes(int);
 
+/* end variable is defined by ld, which specify the end of kernel code */
 struct buffer_head *start_buffer = (struct buffer_head *)&end;
 struct buffer_head *hash_table[NR_HASH];
 static struct buffer_head *free_list;
@@ -405,11 +405,12 @@ void buffer_init(long buffer_end)
 	void *b;
 	int i;
 
-	if (buffer_end == 1 << 20)
+	if (buffer_end == (1 << 20))
 		b = (void *)(640 * 1024); /* 640KB~1MB used for VGA and BIOS */
 	else
 		b = (void *)buffer_end;
 
+	/* init buffer_head[] array */
 	while ((b -= BLOCK_SIZE) >= ((void *)(h + 1))) {
 		h->b_dev = 0;
 		h->b_dirt = 0;
@@ -429,12 +430,15 @@ void buffer_init(long buffer_end)
 			b = (void *)0xa0000;
 	}
 
+	printk("Block buffer size: %d\n", NR_BUFFERS);
+
 	/* let struct buffer_head list become circle list */
 	h--;
 	free_list = start_buffer;
 	free_list->b_prev_free = h;
 	h->b_next_free = free_list;
 
+	/* init hast_table[] array */
 	for (i = 0; i < NR_HASH; i++)
 		hash_table[i] = NULL;
 }	

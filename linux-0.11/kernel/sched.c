@@ -411,37 +411,38 @@ int sys_nice(long increment)
 	return 0;
 }
 
-void sched_init(void)
+void schedule_init(void)
 {
 	int i;
-	struct desc_struct *p;
+	struct descriptor_struct *p;
 
 	if (sizeof(struct sigaction) != 16)
 		panic("Struct sigaction MUST be 16 bytes");
 
-	/* set tss and ldt in gdt for first task: task0 */
+	/* set TSS and LDT in GDT for first task: task0 */
 	set_tss_desc(gdt + FIRST_TSS_ENTRY, &(init_task.task.tss));
 	set_ldt_desc(gdt + FIRST_LDT_ENTRY, &(init_task.task.ldt));
 
-	/* move to first unsed gdt entry */
+	/* move to first unsed GDT entry */
 	p = gdt + NO_USED_SIZE + KERNEL_USED_SIZE + TASK0_USED_SIZE;
 
+	/* init task[] array and GDT table(defined in head.s), start from task1 */
 	for(i = 1; i < NR_TASKS; i++) {
 		task[i] = NULL;
-		p->a = p->b = 0;    /* clear tss */
+		p->a = p->b = 0;    /* clear TSS */
 		p++;
-		p->a = p->b = 0;    /* clear ldt */
+		p->a = p->b = 0;    /* clear LDT */
 		p++;
 	}
 
 	/* Clear NT, so that we won't have troubles with that later on */
 	/* 
 	 * if NT is set, it means back_link in TSS is valid, iret will cause
-	 * task switch
+	 * task switch(i.e. CPU will change TSS value)
 	 */
 	__asm__("pushfl; andl $0xffffbfff, (%esp); popfl");
 
-	/* load task0's tss and ldt */
+	/* load task0's TSS and LDT selector */
 	ltr(0);
 	lldt(0);
 
@@ -450,7 +451,8 @@ void sched_init(void)
 	outb_p(LATCH & 0xff, 0x40); /* LSB */
 	outb(LATCH >> 8, 0x40);	    /* MSB */
 	set_intr_gate(0x20, &timer_interrupt);	/* IRQ0 */
-	outb(inb_p(0x21) & ~0x01, 0x21);    /* enable timer interrupt signal */
+	outb(inb_p(0x21) & 0xfe, 0x21);    /* enable timer interrupt signal */
 
+	/* register system call ISR */
 	set_system_gate(0x80, &system_call);
 }

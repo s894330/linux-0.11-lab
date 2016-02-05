@@ -56,18 +56,25 @@ __asm__("movl %%esp, %%eax\n\t" \
 		((limit) & 0x0ffff); \
 }
 
-#define _set_tssldt_desc(n,addr,type) \
-	__asm__("movw $104, %1\n\t" \
-		"movw %%ax, %2\n\t" \
-		"rorl $16, %%eax\n\t" \
-		"movb %%al, %3\n\t" \
+/* set TSS/LDT seg. to len 104 byte, and store corresponding address to GDT*/
+#define _set_tssldt_desc(n, addr, type) \
+	__asm__("movw $104, %1\n\t" /* seg. limit: 104 byte, because G is 0 */ \
+		"movw %%ax, %2\n\t" /* <0~15> base addr */ \
+		"rorl $16, %%eax\n\t" /* ror: rotate right */\
+		"movb %%al, %3\n\t" /* <16~23> base addr */ \
 		"movb $" type ", %4\n\t" \
-		"movb $0x00, %5\n\t" \
-		"movb %%ah, %6\n\t" \
+		"movb $0x00, %5\n\t" /* set <16~19> len limit to 0 */ \
+		"movb %%ah, %6\n\t" /* <24~31> base addr */ \
 		"rorl $16, %%eax" \
 		::"a" (addr), "m" (*(n)), "m" (*(n + 2)), "m" (*(n + 4)), \
 		"m" (*(n + 5)), "m" (*(n + 6)), "m" (*(n + 7)))
 
+/* 
+ * 0x89: 32bit TSS system segment, DPL 0, present
+ * 0x82: LDT system segment, DPL 0, present
+ */
+//TODO why cast addr to (int), by self test, cast to (long) seens work, too
+//     even no cast also work, too
 #define set_tss_desc(n, addr) _set_tssldt_desc(((char *)(n)), ((int)(addr)), "0x89")
 #define set_ldt_desc(n, addr) _set_tssldt_desc(((char *)(n)), ((int)(addr)), "0x82")
 

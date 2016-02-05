@@ -29,7 +29,7 @@
 extern int copy_page_tables(unsigned long from, unsigned long to, long size);
 extern int free_page_tables(unsigned long from, unsigned long size);
 
-extern void sched_init(void);
+extern void schedule_init(void);
 extern void schedule(void);
 extern void trap_init(void);
 #ifndef PANIC
@@ -103,7 +103,7 @@ struct task_struct {
 	unsigned long close_on_exec;
 	struct file *filp[NR_OPEN];
 /* ldt for this task 0 - zero 1 - cs 2 - ds&ss */
-	struct desc_struct ldt[3];
+	struct descriptor_struct ldt[3];
 /* tss for this task */
 	struct tss_struct tss;
 };
@@ -219,8 +219,12 @@ extern void wake_up(struct task_struct ** p);
 #define NO_USED_SIZE 2	    /* entry 0 and entry 3(syscall) */
 #define KERNEL_USED_SIZE 2  /* kernel code and data seg. */
 #define TASK0_USED_SIZE 2   /* task tss and ldt seg. */
-#define _TSS(n) ((((unsigned long) n) << 4) + (FIRST_TSS_ENTRY << 3))
-#define _LDT(n) ((((unsigned long) n) << 4) + (FIRST_LDT_ENTRY << 3))
+/* 
+ * set both RPL and TI to 0, so need << 3
+ * each task use one TSS and one LDT, so need *2
+ */
+#define _TSS(n) ((FIRST_TSS_ENTRY << 3) + (((unsigned long) n) << 3) * 2)
+#define _LDT(n) ((FIRST_LDT_ENTRY << 3) + (((unsigned long) n) << 3) * 2)
 #define ltr(n) __asm__("ltr %%ax"::"a" (_TSS(n)))
 #define lldt(n) __asm__("lldt %%ax"::"a" (_LDT(n)))
 #define str(n) \

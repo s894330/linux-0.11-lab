@@ -139,7 +139,7 @@ void start_kernel(void)	/* This really IS void, no error here. */
 	char_dev_init();
 	tty_init();	/* we can use printk() only after tty_init() is done */
 	time_init();
-	sched_init();
+	schedule_init();
 	buffer_init(buffer_memory_end);
 	hd_init();
 	floppy_init();

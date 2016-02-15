@@ -110,7 +110,10 @@ no_disk1:
 
 has_disk1:
 	# now we want to move to protected mode ...
-	cli			# no interrupts allowed ! 
+	cli			# no interrupts allowed! because we will set
+				# new interrupt table for protected mode, before
+				# we set it up, interrupt should be ignore to
+				# prevent system crash
 
 	# first we move the system to it's rightful place
 	mov	$0x0000, %ax
@@ -242,13 +245,13 @@ empty_8042:
 tmp_gdt: # one entry 8 bytes
 	.word	0, 0, 0, 0	# dummy
 
-	# 8MB 32bit code size, start at 0x0, DPL 0
+	# 8MB 32bit R/E code size, start at 0x0, DPL 0
 	.word	0x07ff		# 8MB - limit = 2047 (2048 * 4KB = 8MB)
 	.word	0x0000		# base address = 0
 	.word	0x9a00		# code read/exec
 	.word	0x00c0		# granularity = 4096, 386 (32bit)
 
-	# 8MB 32 bit data size, start at 0x0, DPL 0
+	# 8MB 32 bit R/W data size, start at 0x0, DPL 0
 	.word	0x07ff		# 8MB - limit = 2047 (2048 * 4KB = 8MB)
 	.word	0x0000		# base address = 0
 	.word	0x9200		# data read/write

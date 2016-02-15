@@ -69,6 +69,7 @@ struct task_struct *last_task_used_math = NULL;
 
 struct task_struct *task[NR_TASKS] = {&(init_task.task),};
 
+/* 4byte * (4096 / 4) = 4KB stack size */
 long user_stack[PAGE_SIZE >> 2];
 
 struct {

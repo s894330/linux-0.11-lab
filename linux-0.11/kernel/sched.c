@@ -43,6 +43,7 @@ void show_stat(void)
 			show_task(i,task[i]);
 }
 
+/* HZ = 100, means we want the timer interrupt every 10ms */
 #define LATCH (1193180 / HZ)
 
 extern void mem_use(void);
@@ -450,12 +451,16 @@ void schedule_init(void)
 	ltr(0);
 	lldt(0);
 
-	/* init timer */
+	/* init timer chip 8253 */
 	outb_p(0x36, 0x43);	    /* binary, mode 3, LSB/MSB, ch 0 */
 	outb_p(LATCH & 0xff, 0x40); /* LSB */
 	outb(LATCH >> 8, 0x40);	    /* MSB */
-	set_intr_gate(0x20, &timer_interrupt);	/* IRQ0 */
-	outb(inb_p(0x21) & 0xfe, 0x21);    /* enable timer interrupt signal */
+
+	/* register IRQ0 ISR */
+	set_intr_gate(0x20, &timer_interrupt);
+
+	/* enable 8259A timer interrupt signal */
+	outb(inb_p(0x21) & 0xfe, 0x21);
 
 	/* register system call ISR */
 	set_system_gate(0x80, &system_call);

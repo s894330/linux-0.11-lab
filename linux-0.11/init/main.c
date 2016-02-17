@@ -103,6 +103,10 @@ static long memory_end = 0;
 static long buffer_memory_end = 0;
 static long memory_start = 0;
 
+/* 
+ * each hard disk param table is 16byte, so hd_info can store 2 hd param table
+ * data
+ */
 static struct hd_info {
 	char dummy[32];
 } hd_info;

@@ -345,7 +345,7 @@ void do_timer(long cpl)
 		if (!--beepcount)
 			sysbeepstop();
 
-	if (cpl)
+	if (cpl)    /* system is at user mode before timer interrupt */
 		current->utime++;
 	else
 		current->stime++;
@@ -361,11 +361,19 @@ void do_timer(long cpl)
 			(fn)();
 		}
 	}
+
 	if (current_DOR & 0xf0)
 		do_floppy_timer();
-	if ((--current->counter)>0) return;
-	current->counter=0;
-	if (!cpl) return;
+
+	if ((--current->counter) > 0)
+		return;
+
+	/* current process has no any time slice, begin schedule */
+	current->counter = 0;
+
+	/* we forbid schedule() if previous context is at kernel space */
+	if (!cpl)
+		return;
 	schedule();
 }
 

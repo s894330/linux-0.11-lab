@@ -91,7 +91,7 @@ system_call:
 	movl $0x10, %edx	# set up ds,es to kernel data space
 	mov %dx, %ds
 	mov %dx, %es
-	movl $0x17, %edx	# fs points to local data space
+	movl $0x17, %edx	# fs points to local user data space
 	mov %dx, %fs
 	call *sys_call_table(, %eax, 4) # sys_call_table + %eax * 4
 	pushl %eax		# save return value
@@ -107,10 +107,12 @@ ret_from_sys_call:
 	movl current, %eax	# task[0] cannot have signals
 	cmpl task, %eax
 	je 3f
-	cmpw $0x0f, CS(%esp)	# was old code segment supervisor ?
-	jne 3f
-	cmpw $0x17, OLDSS(%esp)	# was stack segment = 0x17 ?
-	jne 3f
+	cmpw $0x08, CS(%esp)	# was old code segment supervisor ?
+	je 3f
+	cmpw $0x10, OLDSS(%esp)	# was old stack segment supervisor ?
+	je 3f
+
+	# previous task is user task, need check signal after system_call
 	movl signal(%eax), %ebx
 	movl blocked(%eax), %ecx
 	notl %ecx
@@ -213,7 +215,7 @@ sys_execve:
 
 .align 4
 sys_fork:
-	call find_empty_process
+	call find_empty_process	# first unused index of task[] will stored in eax
 	testl %eax, %eax
 	js 1f			# if eax < 0, jump
 	push %gs

@@ -1,9 +1,9 @@
 #define move_to_user_mode() \
 __asm__("movl %%esp, %%eax\n\t" \
-	"pushl $0x17\n\t"	    /* push task0 ss */			    \
+	"pushl $0x17\n\t"	    /* push task0 user space ss selector */ \
 	"pushl %%eax\n\t"	    /* push esp */			    \
 	"pushfl\n\t"		    /* push eflags */			    \
-	"pushl $0x0f\n\t"	    /* push task0 cs */			    \
+	"pushl $0x0f\n\t"	    /* push task0 user space cs selector */ \
 	"pushl $1f\n\t"		    /* push eip */			    \
 	"iret\n\t"		    /* from level 0 ret to level 3 */	    \
 	"1:movl $0x17, %%eax\n\t"   /* first code executed in level 3 */    \

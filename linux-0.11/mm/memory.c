@@ -40,7 +40,7 @@ static inline void oom(void)
 __asm__("movl %%eax, %%cr3"::"a" (0))
 
 /* these are not to be changed without changing head.s etc */
-#define LOW_MEM 0x100000
+#define LOW_MEM 0x100000    /* 1MB */
 #define PAGING_MEMORY (15 * 1024 * 1024)
 #define TOTAL_PAGES (PAGING_MEMORY >> 12)
 #define MAP_NR(addr) (((addr) - LOW_MEM) >> 12)
@@ -205,7 +205,10 @@ int copy_page_tables(unsigned long from, unsigned long to, long size)
 		/* set new created page property to “User, R/W, Present" */
 		*to_dir = ((unsigned long)to_page_table) | 7;
 
-		/* if we copy page tables from task 0, only copy 160 entry */
+		/* 
+		 * if we copy page tables from task 0, only copy 160 entry,
+		 * because task0 only has 640KB data size
+		*/
 		nr = (from == 0) ? 0xa0 : 1024;
 		for (; nr-- > 0; from_page_table++, to_page_table++) {
 			this_page = *from_page_table;
@@ -218,7 +221,7 @@ int copy_page_tables(unsigned long from, unsigned long to, long size)
 
 			/* 
 			 * both from_page and to_page share the same 4KB memory
-			 * page
+			 * page, but to_page mark as read only
 			 * */
 			*to_page_table = this_page;
 

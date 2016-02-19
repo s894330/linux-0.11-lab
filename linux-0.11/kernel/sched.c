@@ -149,6 +149,7 @@ void schedule(void)
 			}
 		}
 
+		/* if c = -1 => means next = 0, so we will switch to task0 */
 		if (c) 
 			break;
 
@@ -183,11 +184,11 @@ void sleep_on(struct task_struct **p)
 	if (current == &(init_task.task))
 		panic("task[0] trying to sleep");
 
-	tmp = *p;   /* save previous waiting process */
-	*p = current;
+	tmp = *p;   /* save previous waiting process to tmp */
+	*p = current; /* current process become head waiting process */
 	current->state = TASK_UNINTERRUPTIBLE;
 	schedule();
-	*p = tmp;   /* when waked up, restore previous waiting process */
+	*p = tmp;   /* when switch back, restore previous waiting process */
 
 	if (tmp)
 		tmp->state = TASK_RUNNING;

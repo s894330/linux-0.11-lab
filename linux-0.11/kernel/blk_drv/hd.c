@@ -197,7 +197,8 @@ static int controller_ready(void)
 	int retries = 100000;
 
 	/* if controller is busy, bit 7 of HD_STATUS will set to 1 */
-	while (--retries && (inb_p(HD_STATUS) & 0x80));
+	while (--retries && (inb_p(HD_STATUS) & 0x80))
+		/* nothing */;
 
 	return retries;
 }
@@ -228,8 +229,13 @@ static void hd_out(unsigned int drive, unsigned int nsect, unsigned int sect,
 	if (!controller_ready())
 		panic("HD controller not ready");
 
+	/* setup interrupt handler */
 	do_hd = intr_addr;
+
+	/* send contorl command first */
 	outb_p(hd_info[drive].ctl, HD_CMD);
+
+	/* fill param */
 	port = HD_DATA;
 	outb_p(hd_info[drive].wpcom >> 2, ++port);
 	outb_p(nsect, ++port);
@@ -237,6 +243,8 @@ static void hd_out(unsigned int drive, unsigned int nsect, unsigned int sect,
 	outb_p(cyl, ++port);
 	outb_p(cyl >> 8, ++port);
 	outb_p(0xa0 | (drive << 4) | head, ++port);
+
+	/* issue cmd(WIN_READ/WIN_WRITE/...) */
 	outb(cmd, ++port);
 }
 

@@ -23,7 +23,7 @@ struct request {
 	int dev;		/* -1 if no request */
 	int cmd;		/* READ or WRITE */
 	int errors;
-	unsigned long sector;	/* sector number start to read */
+	unsigned long start_sector;	/* sector number start to read */
 	unsigned long nr_sectors;
 	char *buffer;
 	struct task_struct *waiting;
@@ -42,7 +42,7 @@ struct request {
 	 ((s1)->cmd == (s2)->cmd && \
 	  ((s1)->dev < (s2)->dev || /* min dev number is first */ \
 	   /* min start sector number is first*/ \
-	   ((s1)->dev == (s2)->dev && (s1)->sector < (s2)->sector))))
+	   ((s1)->dev == (s2)->dev && (s1)->start_sector < (s2)->start_sector))))
 
 struct blk_dev_struct {
 	void (*request_fn)(void);
@@ -92,8 +92,8 @@ extern struct task_struct *wait_for_request;
 
 #endif	/* MAJOR_NR */
 
-#define CURRENT (blk_dev[MAJOR_NR].current_request)
-#define CURRENT_DEV DEVICE_NR(CURRENT->dev)
+#define CURRENT_REQ (blk_dev[MAJOR_NR].current_request)
+#define CURRENT_DEV DEVICE_NR(CURRENT_REQ->dev)
 
 #ifdef DEVICE_INTR
 void (*DEVICE_INTR)(void) = NULL;
@@ -115,33 +115,33 @@ static inline void unlock_buffer(struct buffer_head *bh)
 
 static inline void end_request(int uptodate)
 {
-	DEVICE_OFF(CURRENT->dev);
+	DEVICE_OFF(CURRENT_REQ->dev);
 
-	if (CURRENT->bh) {
-		CURRENT->bh->b_uptodate = uptodate;
-		unlock_buffer(CURRENT->bh);
+	if (CURRENT_REQ->bh) {
+		CURRENT_REQ->bh->b_uptodate = uptodate;
+		unlock_buffer(CURRENT_REQ->bh);
 	}
 
 	if (!uptodate) {
 		printk(DEVICE_NAME " I/O error\n\r");
-		printk("dev %04x, block %d\n\r", CURRENT->dev,
-			CURRENT->bh->b_blocknr);
+		printk("dev %04x, block %d\n\r", CURRENT_REQ->dev,
+			CURRENT_REQ->bh->b_blocknr);
 	}
 
-	wake_up(&CURRENT->waiting);
+	wake_up(&CURRENT_REQ->waiting);
 	wake_up(&wait_for_request);
-	CURRENT->dev = -1;
-	CURRENT = CURRENT->next;
+	CURRENT_REQ->dev = -1;
+	CURRENT_REQ = CURRENT_REQ->next;
 }
 
-#define INIT_REQUEST \
+#define CHECK_REQUEST \
 repeat: \
-	if (!CURRENT) \
+	if (!CURRENT_REQ) \
 		return; \
-	if (MAJOR(CURRENT->dev) != MAJOR_NR) \
+	if (MAJOR(CURRENT_REQ->dev) != MAJOR_NR) \
 		panic(DEVICE_NAME ": request list destroyed"); \
-	if (CURRENT->bh) { \
-		if (!CURRENT->bh->b_lock) \
+	if (CURRENT_REQ->bh) { \
+		if (!CURRENT_REQ->bh->b_lock) \
 			panic(DEVICE_NAME ": block not locked"); \
 	}
 

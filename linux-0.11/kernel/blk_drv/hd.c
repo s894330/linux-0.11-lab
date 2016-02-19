@@ -95,7 +95,7 @@ int sys_setup(void * BIOS)
 		return -1;
 	callable = 0;
 
-#ifndef HD_TYPE
+#ifndef HD_TYPE	/* currenty not define HD_TYPE */
 	printk("HD_TYPE no defined, get drive info from BIOS\n");
 	for (drive = 0; drive < 2; drive++) {
 		hd_info[drive].cyl = *(unsigned short *)BIOS;
@@ -119,34 +119,31 @@ int sys_setup(void * BIOS)
 			hd_info[i].head * hd_info[i].sect * hd_info[i].cyl;
 	}
 
-	/*
-		We querry CMOS about hard disks : it could be that 
-		we have a SCSI/ESDI/etc controller that is BIOS
-		compatable with ST-506, and thus showing up in our
-		BIOS table, but not register compatable, and therefore
-		not present in CMOS.
-
-		Furthurmore, we will assume that our ST-506 drives
-		<if any> are the primary drives in the system, and 
-		the ones reflected as drive 1 or 2.
-
-		The first drive is stored in the high nibble of CMOS
-		byte 0x12, the second in the low nibble.  This will be
-		either a 4 bit drive type or 0xf indicating use byte 0x19 
-		for an 8 bit type, drive 1, 0x1a for drive 2 in CMOS.
-
-		Needless to say, a non-zero value means we have 
-		an AT controller hard disk for that drive.
-
-		
-	*/
-	if ((cmos_disks = CMOS_READ(0x12)) & 0xf0)
+	/* 
+	 * We querry CMOS about hard disks : it could be that we have a
+	 * SCSI/ESDI/etc controller that is BIOS compatable with ST-506, and
+	 * thus showing up in our BIOS table, but not register compatable, and
+	 * therefore not present in CMOS.
+	 *
+	 * Furthurmore, we will assume that our ST-506 drives <if any> are the
+	 * primary drives in the system, and the ones reflected as drive 1 or 2.
+	 *
+	 * The first drive is stored in the high nibble of CMOS byte 0x12, the
+	 * second in the low nibble.  This will be either a 4 bit drive type or
+	 * 0xf indicating use byte 0x19 for an 8 bit type, drive 1, 0x1a for
+	 * drive 2 in CMOS.
+	 *
+	 * Needless to say, a non-zero value means we have an AT controller hard
+	 * disk for that drive.
+	 */
+	if ((cmos_disks = CMOS_READ(0x12)) & 0xf0) {
 		if (cmos_disks & 0x0f)
 			NR_HD = 2;
 		else
 			NR_HD = 1;
-	else
+	} else {
 		NR_HD = 0;
+	}
 
 	printk("There are %d hard disk in system\n", NR_HD);
 
@@ -158,7 +155,7 @@ int sys_setup(void * BIOS)
 
 	/* fetch partiton info */
 	for (drive = 0; drive < NR_HD; drive++) {
-		/* read boot sector */
+		/* read 1st block (Minix fs: 1 block = 2 sectors = 1KB) */
 		if (!(bh = bread(0x300 + drive * 5, 0))) {
 			printk("Unable to read partition table of drive %d\n",
 				drive);
@@ -289,10 +286,10 @@ void unexpected_hd_interrupt(void)
 
 static void bad_rw_intr(void)
 {
-	if (++CURRENT->errors >= MAX_ERRORS)
+	if (++CURRENT_REQ->errors >= MAX_ERRORS)
 		end_request(0);
 
-	if (CURRENT->errors > MAX_ERRORS / 2)
+	if (CURRENT_REQ->errors > MAX_ERRORS / 2)
 		reset = 1;
 }
 
@@ -304,12 +301,12 @@ static void read_intr(void)
 		return;
 	}
 
-	port_read(HD_DATA, CURRENT->buffer, 256);
-	CURRENT->errors = 0;
-	CURRENT->buffer += 512;
-	CURRENT->sector++;
+	port_read(HD_DATA, CURRENT_REQ->buffer, 256);
+	CURRENT_REQ->errors = 0;
+	CURRENT_REQ->buffer += 512;
+	CURRENT_REQ->start_sector++;
 
-	if (--CURRENT->nr_sectors) {
+	if (--CURRENT_REQ->nr_sectors) {
 		do_hd = &read_intr;
 		return;
 	}
@@ -326,11 +323,11 @@ static void write_intr(void)
 		return;
 	}
 
-	if (--CURRENT->nr_sectors) {
-		CURRENT->sector++;
-		CURRENT->buffer += 512;
+	if (--CURRENT_REQ->nr_sectors) {
+		CURRENT_REQ->start_sector++;
+		CURRENT_REQ->buffer += 512;
 		do_hd = &write_intr;
-		port_write(HD_DATA, CURRENT->buffer, 256);
+		port_write(HD_DATA, CURRENT_REQ->buffer, 256);
 		return;
 	}
 
@@ -348,32 +345,33 @@ static void recal_intr(void)
 void do_hd_request(void)
 {
 	int i, r = 0;
-	unsigned int block, dev;
+	unsigned int start_sector, dev, partition;
 	unsigned int sec, head, cyl;
 	unsigned int nsect;
 
-	INIT_REQUEST;
-	dev = MINOR(CURRENT->dev);  /* get partition */
-	block = CURRENT->sector;
+	CHECK_REQUEST;
+	partition = MINOR(CURRENT_REQ->dev);  /* get partition */
+	start_sector = CURRENT_REQ->start_sector;
+
 	/* 
 	 * because we read 2 sectors each time, so we need to check if
-	 * block + 2 is exceed the limit or not
+	 * start_sector + 2 is exceed the limit or not
 	 */
-	if (dev >= 5 * NR_HD || block + 2 > hd[dev].nr_sects) {
+	if (partition >= 5 * NR_HD || start_sector + 2 > hd[partition].nr_sects) {
 		end_request(0);
 		goto repeat;	/* repeat defined in blk.h */
 	}
 
-	block += hd[dev].start_sect;
-	dev /= 5;
+	start_sector += hd[partition].start_sect;
+	dev = partition / 5;
 
-	/* get cyl, head, sec number according block */
-	__asm__("divl %4":"=a" (block), "=d" (sec):"0" (block), "1" (0),
-		"r" (hd_info[dev].sect));
-	__asm__("divl %4":"=a" (cyl), "=d" (head):"0" (block), "1" (0),
+	/* get cyl, head, sec number according start_sector */
+	__asm__("divl %4":"=a" (start_sector), "=d" (sec):"0" (start_sector),
+		"1" (0), "r" (hd_info[dev].sect));
+	__asm__("divl %4":"=a" (cyl), "=d" (head):"0" (start_sector), "1" (0),
 		"r" (hd_info[dev].head));
 	sec++;
-	nsect = CURRENT->nr_sectors;
+	nsect = CURRENT_REQ->nr_sectors;
 
 	if (reset) {
 		reset = 0;
@@ -389,7 +387,7 @@ void do_hd_request(void)
 		return;
 	}
 
-	if (CURRENT->cmd == WRITE) {
+	if (CURRENT_REQ->cmd == WRITE) {
 		hd_out(dev, nsect, sec, head, cyl, WIN_WRITE, write_intr);
 
 		/* wait DRQ_STAT signal */
@@ -402,8 +400,8 @@ void do_hd_request(void)
 		}
 
 		/* write 512 byte (1 sector) to HD */
-		port_write(HD_DATA, CURRENT->buffer, 256);
-	} else if (CURRENT->cmd == READ) {
+		port_write(HD_DATA, CURRENT_REQ->buffer, 256);
+	} else if (CURRENT_REQ->cmd == READ) {
 		hd_out(dev, nsect, sec, head, cyl, WIN_READ, read_intr);
 	} else {
 		panic("unknown hd-command");

@@ -258,6 +258,7 @@ repeat:
 	}
 
 	wait_on_buffer(bh);
+
 	/* if bh is used by other process during wait_on_buffer(), loop again */
 	if (bh->b_count)
 		goto repeat;
@@ -278,7 +279,7 @@ repeat:
 
 	/* 
 	 * OK, FINALLY we know that this buffer is the only one of it's kind,
-	 * and that it's unused (b_count=0), unlocked (b_lock=0), and clean
+	 * and that it's unused (b_count = 0), unlocked (b_lock = 0), and clean
 	 */
 	bh->b_count = 1;
 	bh->b_dirt = 0;
@@ -309,6 +310,7 @@ struct buffer_head *bread(int dev, int block)
 {
 	struct buffer_head *bh;
 
+	/* request a buffer_head first */
 	if (!(bh = getblk(dev, block)))
 		panic("bread: getblk returned NULL\n");
 

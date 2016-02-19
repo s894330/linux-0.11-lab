@@ -66,20 +66,22 @@ static void add_request(struct blk_dev_struct *dev, struct request *req)
 	struct request *tmp;
 
 	req->next = NULL;
-	cli();
 
+	cli();
 	if (req->bh)
 		req->bh->b_dirt = 0;
 
-	if (!(tmp = dev->current_request)) {
-		/* currently no request */
+	if (!(tmp = dev->current_request)) {	/* currently no request */
 		dev->current_request = req;
 		sti();
 		(dev->request_fn)();
 		return;
 	}
 
-	/* Elevator algorithm to find proper insert location */
+	/* 
+	 * currently already has request in queue, using elevator algorithm to
+	 * find proper insert location
+	 */
 	for (; tmp->next; tmp = tmp->next) {
 		if ((IN_ORDER(tmp, req) || !IN_ORDER(tmp, tmp->next)) &&
 			IN_ORDER(req, tmp->next))
@@ -113,6 +115,10 @@ static void make_request(int major, int rw, struct buffer_head *bh)
 	if (rw != READ && rw != WRITE)
 		panic("Bad block dev command, must be R/W/RA/WA");
 
+	/* 
+	 * we are going to read data from disk into this buffer_head, so we
+	 * should lock this bh until this job done
+	 */
 	lock_buffer(bh);
 	if ((rw == WRITE && !bh->b_dirt) || (rw == READ && bh->b_uptodate)) {
 		unlock_buffer(bh);
@@ -129,7 +135,7 @@ repeat:
 	else
 		req = request + ((NR_REQUEST * 2) / 3);
 	
-	/* find an empty request */
+	/* find an empty request[] item */
 	while (--req >= request)
 		if (req->dev < 0)
 			break;
@@ -144,16 +150,17 @@ repeat:
 		goto repeat;
 	}
 
-	/* fill up the request-info, and add it to the queue */
+	/* fill up the request-info, and add it to the request queue */
 	req->dev = bh->b_dev;
 	req->cmd = rw;
 	req->errors = 0;
-	req->sector = bh->b_blocknr << 1;
+	req->start_sector = bh->b_blocknr << 1;
 	req->nr_sectors = 2;
 	req->buffer = bh->b_data;
 	req->waiting = NULL;
 	req->bh = bh;
 	req->next = NULL;
+
 	add_request(blk_dev + major, req);
 }
 

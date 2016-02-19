@@ -25,19 +25,19 @@ void do_rd_request(void)
 	int	len;
 	char	*addr;
 
-	INIT_REQUEST;
-	addr = rd_start + (CURRENT->sector << 9);
-	len = CURRENT->nr_sectors << 9;
-	if ((MINOR(CURRENT->dev) != 1) || (addr+len > rd_start+rd_length)) {
+	CHECK_REQUEST;
+	addr = rd_start + (CURRENT_REQ->start_sector << 9);
+	len = CURRENT_REQ->nr_sectors << 9;
+	if ((MINOR(CURRENT_REQ->dev) != 1) || (addr+len > rd_start+rd_length)) {
 		end_request(0);
 		goto repeat;
 	}
-	if (CURRENT-> cmd == WRITE) {
+	if (CURRENT_REQ-> cmd == WRITE) {
 		(void ) memcpy(addr,
-			      CURRENT->buffer,
+			      CURRENT_REQ->buffer,
 			      len);
-	} else if (CURRENT->cmd == READ) {
-		(void) memcpy(CURRENT->buffer, 
+	} else if (CURRENT_REQ->cmd == READ) {
+		(void) memcpy(CURRENT_REQ->buffer, 
 			      addr,
 			      len);
 	} else

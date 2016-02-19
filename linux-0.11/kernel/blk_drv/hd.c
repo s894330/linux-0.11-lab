@@ -357,7 +357,9 @@ void do_hd_request(void)
 	 * because we read 2 sectors each time, so we need to check if
 	 * start_sector + 2 is exceed the limit or not
 	 */
-	if (partition >= 5 * NR_HD || start_sector + 2 > hd[partition].nr_sects) {
+	if (partition >= 5 * NR_HD || 
+		(start_sector + 2) > 
+		(hd[partition].start_sect + hd[partition].nr_sects - 1)) {
 		end_request(0);
 		goto repeat;	/* repeat defined in blk.h */
 	}

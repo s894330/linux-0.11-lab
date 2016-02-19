@@ -352,14 +352,10 @@ void do_hd_request(void)
 	CHECK_REQUEST;
 	partition = MINOR(CURRENT_REQ->dev);  /* get partition */
 	start_sector = CURRENT_REQ->start_sector;
+	nsect = CURRENT_REQ->nr_sectors;
 
-	/* 
-	 * because we read 2 sectors each time, so we need to check if
-	 * start_sector + 2 is exceed the limit or not
-	 */
-	if (partition >= 5 * NR_HD || 
-		(start_sector + 2) > 
-		(hd[partition].start_sect + hd[partition].nr_sects - 1)) {
+	/* need to check if nsect is exceed the partition limit or not */
+	if (partition >= 5 * NR_HD || nsect > hd[partition].nr_sects) {
 		end_request(0);
 		goto repeat;	/* repeat defined in blk.h */
 	}
@@ -368,12 +364,19 @@ void do_hd_request(void)
 	dev = partition / 5;
 
 	/* get cyl, head, sec number according start_sector */
+	/* div result: EAX = Quotient, EDX = Remainder */
+	/* 
+	 * start_sector / sect nrs per track = total track number(start_sector) 
+	 * ... remainder sector number(sec)
+	 */
 	__asm__("divl %4":"=a" (start_sector), "=d" (sec):"0" (start_sector),
 		"1" (0), "r" (hd_info[dev].sect));
+
+	/* totoal track number / total head nrs = cylinder number(cyl)
+	 * ... head nr(head) */
 	__asm__("divl %4":"=a" (cyl), "=d" (head):"0" (start_sector), "1" (0),
 		"r" (hd_info[dev].head));
 	sec++;
-	nsect = CURRENT_REQ->nr_sectors;
 
 	if (reset) {
 		reset = 0;

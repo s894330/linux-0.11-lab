@@ -79,7 +79,7 @@ __asm__("cld; rep; insw"::"d" (port), "D" (buf), "c" (nr))
 __asm__("cld; rep; outsw"::"d" (port), "S" (buf), "c" (nr))
 
 extern void hd_interrupt(void);
-extern void rd_load(void);
+extern void ramdisk_load(void);
 
 /* This may be used only once, enforced by 'static int callable' */
 int sys_setup(void * BIOS)
@@ -186,7 +186,7 @@ int sys_setup(void * BIOS)
 	if (NR_HD)
 		printk("Read partition table%s ok.\n", (NR_HD > 1) ? "s" : "");
 
-	rd_load();
+	ramdisk_load();
 
 	printk("Mounting root filesystem...\n");
 	mount_root();

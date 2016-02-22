@@ -296,9 +296,11 @@ void brelse(struct buffer_head *buf)
 {
 	if (!buf)
 		return;
+
 	wait_on_buffer(buf);
-	if (!(buf->b_count--))
+	if (!buf->b_count)
 		panic("Trying to free free buffer");
+	buf->b_count--;
 	wake_up(&buffer_wait);
 }
 
@@ -378,10 +380,11 @@ struct buffer_head *breada(int dev, int first, ...)
 	va_start(args, first);
 	if (!(bh = getblk(dev, first)))
 		panic("bread: getblk returned NULL\n");
+
 	if (!bh->b_uptodate)
 		ll_rw_block(READ, bh);
 
-	while ((first = va_arg(args, int)) >=0 ) {
+	while ((first = va_arg(args, int)) >= 0 ) {
 		tmp = getblk(dev, first);
 		if (tmp) {
 			if (!tmp->b_uptodate)
@@ -391,8 +394,8 @@ struct buffer_head *breada(int dev, int first, ...)
 			tmp->b_count--;
 		}
 	}
-
 	va_end(args);
+
 	wait_on_buffer(bh);
 	if (bh->b_uptodate)
 		return bh;

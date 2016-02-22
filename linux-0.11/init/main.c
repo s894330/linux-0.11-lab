@@ -53,7 +53,7 @@ extern void char_dev_init(void);
 extern void hd_init(void);
 extern void floppy_init(void);
 extern void memory_init(long start, long end);
-extern long rd_init(long mem_start, int length);
+extern long ramdisk_init(long mem_start, int length);
 extern long kernel_mktime(struct tm * tm);
 extern long startup_time;
 
@@ -135,7 +135,7 @@ void start_kernel(void)	/* This really IS void, no error here. */
 
 	memory_start = buffer_memory_end;
 #ifdef RAMDISK	/* currently we don't use ramdisk. Nail 2016/2/4 */
-	memory_start += rd_init(memory_start, RAMDISK * 1024);
+	memory_start += ramdisk_init(memory_start, RAMDISK * 1024);
 #endif
 	memory_init(memory_start, memory_end);
 	trap_init();

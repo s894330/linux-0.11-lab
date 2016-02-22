@@ -20,7 +20,7 @@
 char	*rd_start;
 int	rd_length = 0;
 
-void do_rd_request(void)
+void do_ramdisk_request(void)
 {
 	int	len;
 	char	*addr;
@@ -49,7 +49,7 @@ void do_rd_request(void)
 /*
  * Returns amount of memory which needs to be reserved.
  */
-long rd_init(long mem_start, int length)
+long ramdisk_init(long mem_start, int length)
 {
 	int	i;
 	char	*cp;
@@ -68,58 +68,73 @@ long rd_init(long mem_start, int length)
  * In order to do this, the root device is originally set to the
  * floppy, and we later change it to be ram disk.
  */
-void rd_load(void)
+void ramdisk_load(void)
 {
 	struct buffer_head *bh;
-	struct super_block	s;
-	int		block = 256;	/* Start at block 256 */
-	int		i = 1;
-	int		nblocks;
-	char		*cp;		/* Move pointer */
+	struct super_block s;
+	int block = 256;	/* Start at block 256 */
+	int i = 1;
+	int nblocks;
+	char *cp;		/* Move pointer */
 	
 	if (!rd_length)
 		return;
+
 	printk("Ram disk: %d bytes, starting at 0x%x\n", rd_length,
-		(int) rd_start);
+		(int)rd_start);
+
 	if (MAJOR(ROOT_DEV) != 2)
 		return;
-	bh = breada(ROOT_DEV,block+1,block,block+2,-1);
+
+	/* read super block and pre-read other block */
+	bh = breada(ROOT_DEV, block + 1, block, block + 2, -1);
 	if (!bh) {
 		printk("Disk error while looking for ramdisk!\n");
 		return;
 	}
-	*((struct d_super_block *) &s) = *((struct d_super_block *) bh->b_data);
+
+	*((struct d_super_block *)&s) = *((struct d_super_block *)bh->b_data);
 	brelse(bh);
+
+	/* No ram disk image exist, assume normal floppy boot */
 	if (s.s_magic != SUPER_MAGIC)
-		/* No ram disk image present, assume normal floppy boot */
 		return;
+
+	/* get total blocks occupied by MINIX 1.0 filesystem */
 	nblocks = s.s_nzones << s.s_log_zone_size;
 	if (nblocks > (rd_length >> BLOCK_SIZE_BITS)) {
 		printk("Ram disk image too big!  (%d blocks, %d avail)\n", 
 			nblocks, rd_length >> BLOCK_SIZE_BITS);
 		return;
 	}
-	printk("Loading %d bytes into ram disk... 0000k", 
+
+	/* begin load filesystem into memory */
+	printk("Loading %d bytes into ram disk... 0000k",
 		nblocks << BLOCK_SIZE_BITS);
 	cp = rd_start;
 	while (nblocks) {
 		if (nblocks > 2) 
-			bh = breada(ROOT_DEV, block, block+1, block+2, -1);
+			bh = breada(ROOT_DEV, block, block + 1, block + 2, -1);
 		else
 			bh = bread(ROOT_DEV, block);
+
 		if (!bh) {
-			printk("I/O error on block %d, aborting load\n", 
-				block);
+			printk("I/O error on block %d, aborting load\n", block);
 			return;
 		}
-		(void) memcpy(cp, bh->b_data, BLOCK_SIZE);
+
+		/* copy data from buffer_head to ramdisk memory zone */
+		(void)memcpy(cp, bh->b_data, BLOCK_SIZE);
 		brelse(bh);
-		printk("\010\010\010\010\010%4dk",i);
+
+		/* ascii 011 = <TAB> */
+		printk("\011\011\011\011\011%4dk", i);
 		cp += BLOCK_SIZE;
 		block++;
 		nblocks--;
 		i++;
 	}
-	printk("\010\010\010\010\010done \n");
-	ROOT_DEV=0x0101;
+
+	printk("\011\011\011\011\011done\n");
+	ROOT_DEV = 0x0101;
 }

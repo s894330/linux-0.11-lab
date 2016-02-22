@@ -162,6 +162,7 @@ int sys_setup(void * BIOS)
 			panic("");
 		}
 
+		/* validate if it is the boot sector */
 		if (bh->b_data[510] != 0x55 ||
 			((unsigned char)bh->b_data[511]) != 0xaa) {
 			printk("Bad partition table on drive %d\n", drive);
@@ -169,15 +170,16 @@ int sys_setup(void * BIOS)
 		}
 
 		/* partition table is at 0x1be of first block */
-		p = 0x1be + (void *)bh->b_data;
+		p = (void *)bh->b_data + 0x01be;
 
-		/* calculate each partition's start/total sectors */
+		/* save each partition's start/total sectors information */
 		for (i = 1; i < 5; i++, p++) {
-			hd[5 * drive + i].start_sect = p->start_sect;
-			hd[5 * drive + i].nr_sects = p->nr_sects;
+			hd[drive * 5 + i].start_sect = p->start_sect;
+			hd[drive * 5 + i].nr_sects = p->nr_sects;
 			printk("partition %d of HD %d start sector: %ld, nr_sects: %ld\n",
 				i, drive + 1, p->start_sect, p->nr_sects);
 		}
+
 		brelse(bh);
 	}
 	
@@ -203,6 +205,7 @@ static int controller_ready(void)
 	return retries;
 }
 
+/* check hard disk command result, "win" means winchester hard disk */
 static int win_result(void)
 {
 	int i = inb_p(HD_STATUS);
@@ -211,15 +214,16 @@ static int win_result(void)
 		== (READY_STAT | SEEK_STAT))
 		return 0; /* ok */
 
+	/* if ERR_STAT bit is set, read error register */
 	if (i & ERR_STAT)
 		i = inb(HD_ERROR);
 
 	return 1;
 }
 
-static void hd_out(unsigned int drive, unsigned int nsect, unsigned int sect,
-		unsigned int head, unsigned int cyl, unsigned int cmd,
-		void (*intr_addr)(void))
+static void hd_out(unsigned int drive, unsigned int nsect,
+		unsigned int start_sect, unsigned int head, unsigned int cyl,
+		unsigned int cmd, void (*intr_addr)(void))
 {
 	register int port;
 
@@ -239,7 +243,7 @@ static void hd_out(unsigned int drive, unsigned int nsect, unsigned int sect,
 	port = HD_DATA;
 	outb_p(hd_info[drive].wpcom >> 2, ++port);
 	outb_p(nsect, ++port);
-	outb_p(sect, ++port);
+	outb_p(start_sect, ++port);
 	outb_p(cyl, ++port);
 	outb_p(cyl >> 8, ++port);
 	outb_p(0xa0 | (drive << 4) | head, ++port);
@@ -303,13 +307,16 @@ static void bad_rw_intr(void)
 
 static void read_intr(void)
 {
+	/* check previous read command success or not */
 	if (win_result()) {
 		bad_rw_intr();
 		do_hd_request();
 		return;
 	}
 
+	/* read data from hard disk from data register */
 	port_read(HD_DATA, CURRENT_REQ->buffer, 256);
+
 	CURRENT_REQ->errors = 0;
 	CURRENT_REQ->buffer += 512;
 	CURRENT_REQ->start_sector++;
@@ -354,7 +361,7 @@ void do_hd_request(void)
 {
 	int i, r = 0;
 	unsigned int start_sector, dev, partition;
-	unsigned int sec, head, cyl;
+	unsigned int start_sec, head, cyl;
 	unsigned int nsect;
 
 	CHECK_REQUEST;
@@ -371,20 +378,23 @@ void do_hd_request(void)
 	start_sector += hd[partition].start_sect;
 	dev = partition / 5;
 
-	/* get cyl, head, sec number according start_sector */
+	/* get cyl, head, start_sec number according start_sector */
 	/* div result: EAX = Quotient, EDX = Remainder */
 	/* 
 	 * start_sector / sect nrs per track = total track number(start_sector) 
-	 * ... remainder sector number(sec)
+	 * ... remainder sector number(start_sec)
 	 */
-	__asm__("divl %4":"=a" (start_sector), "=d" (sec):"0" (start_sector),
-		"1" (0), "r" (hd_info[dev].sect));
+	__asm__("divl %4"
+		:"=a" (start_sector), "=d" (start_sec)
+		:"0" (start_sector), "1" (0), "r" (hd_info[dev].sect));
 
 	/* totoal track number / total head nrs = cylinder number(cyl)
 	 * ... head nr(head) */
-	__asm__("divl %4":"=a" (cyl), "=d" (head):"0" (start_sector), "1" (0),
-		"r" (hd_info[dev].head));
-	sec++;
+	__asm__("divl %4"
+		:"=a" (cyl), "=d" (head)
+		:"0" (start_sector), "1" (0), "r" (hd_info[dev].head));
+
+	start_sec++;
 
 	if (reset) {
 		reset = 0;
@@ -401,7 +411,7 @@ void do_hd_request(void)
 	}
 
 	if (CURRENT_REQ->cmd == WRITE) {
-		hd_out(dev, nsect, sec, head, cyl, WIN_WRITE, write_intr);
+		hd_out(dev, nsect, start_sec, head, cyl, WIN_WRITE, write_intr);
 
 		/* wait DRQ_STAT signal */
 		for(i = 0; i < 3000 && !(r = inb_p(HD_STATUS) & DRQ_STAT); i++)
@@ -415,7 +425,7 @@ void do_hd_request(void)
 		/* write 512 byte (1 sector) to HD */
 		port_write(HD_DATA, CURRENT_REQ->buffer, 256);
 	} else if (CURRENT_REQ->cmd == READ) {
-		hd_out(dev, nsect, sec, head, cyl, WIN_READ, read_intr);
+		hd_out(dev, nsect, start_sec, head, cyl, WIN_READ, read_intr);
 	} else {
 		panic("unknown hd-command");
 	}

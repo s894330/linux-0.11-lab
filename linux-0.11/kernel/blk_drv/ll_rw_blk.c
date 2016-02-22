@@ -39,19 +39,19 @@ struct blk_dev_struct blk_dev[NR_BLK_DEV] = {
 	{NULL, NULL}		/* dev lp */
 };
 
-static inline void lock_buffer(struct buffer_head * bh)
+static inline void lock_buffer(struct buffer_head *bh)
 {
 	cli();
 	while (bh->b_lock)
 		sleep_on(&bh->b_wait);
-	bh->b_lock=1;
+	bh->b_lock = 1;
 	sti();
 }
 
-static inline void unlock_buffer(struct buffer_head * bh)
+static inline void unlock_buffer(struct buffer_head *bh)
 {
 	if (!bh->b_lock)
-		printk("ll_rw_block.c: buffer not locked\n\r");
+		printk("ll_rw_block.c: buffer not locked\n");
 	bh->b_lock = 0;
 	wake_up(&bh->b_wait);
 }

@@ -113,6 +113,7 @@ static inline void unlock_buffer(struct buffer_head *bh)
 	wake_up(&bh->b_wait);
 }
 
+/* uptodate means data which in memory is the same as data in disk */
 static inline void end_request(int uptodate)
 {
 	DEVICE_OFF(CURRENT_REQ->dev);
@@ -123,13 +124,16 @@ static inline void end_request(int uptodate)
 	}
 
 	if (!uptodate) {
-		printk(DEVICE_NAME " I/O error\n\r");
-		printk("dev %04x, block %d\n\r", CURRENT_REQ->dev,
-			CURRENT_REQ->bh->b_blocknr);
+		printk(DEVICE_NAME " I/O error\n");
+		printk("requested dev %04x, sector number: %d\n",
+			CURRENT_REQ->dev, CURRENT_REQ->bh->b_blocknr * 2);
 	}
 
+	/* current code no one wait this "waiting"" lock */
 	wake_up(&CURRENT_REQ->waiting);
 	wake_up(&wait_for_request);
+
+	/* clean up request and move to next request */
 	CURRENT_REQ->dev = -1;
 	CURRENT_REQ = CURRENT_REQ->next;
 }

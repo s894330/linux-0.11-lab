@@ -239,18 +239,24 @@ hd_interrupt:
 	mov %ax, %es
 	movl $0x17, %eax	# fs = task data seg.
 	mov %ax, %fs
+
 	movb $0x20, %al
 	outb %al, $0xa0		# EOI to interrupt controller 8259A slave
+
 	jmp 1f			# give port chance to breathe
 1:	jmp 1f
+
 1:	xorl %edx, %edx
-	xchgl do_hd, %edx
+	xchgl do_hd, %edx	# clean do_hd function pointer
 	testl %edx, %edx	# test if edx is NULL
 	jne 1f
 	movl $unexpected_hd_interrupt, %edx
+
 1:	outb %al, $0x20		# EOI to interrupt controller 8259A master to
 				# end interrupt
+
 	call *%edx		# "interesting" way of handling intr.
+
 	pop %fs
 	pop %es
 	pop %ds

@@ -40,7 +40,15 @@ __asm__("movl %%esp, %%eax\n\t" \
 		"o" (*((char *)(gate_addr) + 4)), \
 		"d" ((char *)(ISR_addr)), "a" (0x00080000))
 
-/* idt table is defined in head.s, 14: interrupt gate, 15: trap gate */
+/* 
+ * idt table is defined in head.s, 14: interrupt gate, 15: trap gate.
+ *
+ * one different between interrupt gate and trap gate is that interrupt gate
+ * will set IF to 0 when interrupt occurred and resume it after "iret" command,
+ * this cause disable all other interrupt to interrupt CPU again(which maybe
+ * cause loop interrupt trouble) during CPU executing this time interrupt
+ * handler, but trap gate will not do this, i.e. will not set IF to 0.
+ */
 #define set_intr_gate(n, ISR_addr) _set_gate(&idt[n], 14, 0, ISR_addr)
 #define set_trap_gate(n, ISR_addr) _set_gate(&idt[n], 15, 0, ISR_addr)
 #define set_system_gate(n, ISR_addr) _set_gate(&idt[n], 15, 3, ISR_addr)

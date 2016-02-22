@@ -157,10 +157,11 @@ void schedule(void)
 		 * now c = 0, means every task's counter is 0, need re-allocate
 		 * all task's counter
 		 */
-		for (p = &LAST_TASK; p > &FIRST_TASK; --p)
+		for (p = &LAST_TASK; p > &FIRST_TASK; --p) {
 			if (*p)
 				(*p)->counter = ((*p)->counter >> 1) + 
-					(*p)->priority;
+				    (*p)->priority;
+		}
 	}
 
 	switch_to(next);

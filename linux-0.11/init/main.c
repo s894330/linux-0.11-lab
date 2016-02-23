@@ -194,6 +194,7 @@ void init(void)
 	int pid, stat;
 
 	setup((void *)&hd_info);
+
 	/* 
 	 * cast unused return value to void is to explicitly show other
 	 * "developers" that you know this function returns but you're
@@ -207,7 +208,7 @@ void init(void)
 	(void)dup(0);	/* duplicate fd 0 to fd 2(stderr) */
 	printf("%d buffer_head = %d bytes buffer space\n", NR_BUFFERS,
 		NR_BUFFERS * BLOCK_SIZE);
-	printf("Free mem: %d bytes\n", memory_end - memory_start);
+	printf("Total available memory: %d bytes\n", memory_end - memory_start);
 
 	if (!(pid = fork())) {
 		/* redirect stdin(fd 0) to /etc/rc */

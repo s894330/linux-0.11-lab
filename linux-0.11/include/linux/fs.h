@@ -121,7 +121,7 @@ struct m_inode {
 struct file {
 	unsigned short f_mode;	    /* the same as i_mode in struct d_inode */
 	unsigned short f_flags;	    /* flags used in open() */
-	unsigned short f_count;
+	unsigned short f_count;	    /* reference count */
 	struct m_inode *f_inode;    /* file corresponding inode */
 	off_t f_pos;		    /* current read/write position */
 };
@@ -139,12 +139,12 @@ struct super_block {
 	struct buffer_head *s_imap[I_MAP_SLOTS];
 	struct buffer_head *s_zmap[Z_MAP_SLOTS];
 	unsigned short s_dev;
-	struct m_inode *s_isup;
+	struct m_inode *s_isuper;
 	struct m_inode *s_imount;
 	unsigned long s_time;
 	struct task_struct *s_wait;
 	unsigned char s_lock;
-	unsigned char s_rd_only;
+	unsigned char s_read_only;
 	unsigned char s_dirt;
 };
 

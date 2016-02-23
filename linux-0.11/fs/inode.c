@@ -271,6 +271,7 @@ struct m_inode *iget(int dev, int nr)
 	/* get empty inode struct form inode_table */
 	empty = get_empty_inode();
 
+	/* check if inode of (dev, nr) already in inode_table */
 	inode = inode_table;
 	while (inode < inode_table + NR_INODE) {
 		if (inode->i_dev != dev || inode->i_num != nr) {
@@ -321,7 +322,6 @@ struct m_inode *iget(int dev, int nr)
 	inode->i_dev = dev;
 	inode->i_num = nr;
 
-	/* read inode into buffer_head */
 	read_inode(inode);
 
 	return inode;
@@ -337,12 +337,14 @@ static void read_inode(struct m_inode *inode)
 	if (!(sb = get_super(inode->i_dev)))
 		panic("trying to read inode without dev");
 
+	/* get block number of this inode */
 	block = 2 + sb->s_imap_blocks + sb->s_zmap_blocks +
 		(inode->i_num - 1)/INODES_PER_BLOCK;
 
 	if (!(bh = bread(inode->i_dev, block)))
 		panic("unable to read i-node block");
 
+	/* copy inode data from disk */
 	*(struct d_inode *)inode = ((struct d_inode *)bh->b_data)
 					[(inode->i_num - 1) % INODES_PER_BLOCK];
 	brelse(bh);

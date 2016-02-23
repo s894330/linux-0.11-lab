@@ -63,13 +63,17 @@ struct super_block *get_super(int dev)
 	if (!dev)
 		return NULL;
 
-	/* check if super block of dev is already in super_block[] */
+	/* check if dev's super block is already in super_block[] */
 	s = super_block;
-	while (s < NR_SUPER + super_block) {
+	while (s < super_block + NR_SUPER) {
 		if (s->s_dev == dev) {
 			wait_on_super(s);
 			if (s->s_dev == dev)
 				return s;
+			/* 
+			 * s->s_dev has been changed during wait_on_super, loop
+			 * check again
+			 */
 			s = super_block;
 		} else {
 			s++;
@@ -138,28 +142,27 @@ static struct super_block *read_super(int dev)
 
 	/* find first unused super_block[] item */
 	for (s = super_block;; s++) {
-		if (s >= NR_SUPER + super_block)
+		if (s >= super_block + NR_SUPER)
 			return NULL;
-
-		if (!s->s_dev)
+		if (!s->s_dev)	/* found unused one, return */
 			break;
 	}
 
 	s->s_dev = dev;
-	s->s_isup = NULL;
+	s->s_isuper = NULL;
 	s->s_imount = NULL;
 	s->s_time = 0;
-	s->s_rd_only = 0;
+	s->s_read_only = 0;
 	s->s_dirt = 0;
 
 	lock_super(s);
-	if (!(bh = bread(dev, 1))) {
+	if (!(bh = bread(dev, 1))) {	/* read super block from disk */
 		s->s_dev = 0;
 		unlock_super(s);
 		return NULL;
 	}
 
-	/* copy super block data */
+	/* copy super block data into super_block[] */
 	*((struct d_super_block *)s) = *((struct d_super_block *)bh->b_data);
 	brelse(bh);
 
@@ -172,7 +175,7 @@ static struct super_block *read_super(int dev)
 		return NULL;
 	}
 
-	for (i = 0;i < I_MAP_SLOTS; i++)
+	for (i = 0; i < I_MAP_SLOTS; i++)
 		s->s_imap[i] = NULL;
 
 	for (i = 0; i < Z_MAP_SLOTS; i++)
@@ -246,8 +249,8 @@ int sys_umount(char * dev_name)
 	sb->s_imount->i_mount=0;
 	iput(sb->s_imount);
 	sb->s_imount = NULL;
-	iput(sb->s_isup);
-	sb->s_isup = NULL;
+	iput(sb->s_isuper);
+	sb->s_isuper = NULL;
 	put_super(dev);
 	sync_dev(dev);
 	return 0;
@@ -295,61 +298,62 @@ int sys_mount(char * dev_name, char * dir_name, int rw_flag)
 	return 0;			/* we do that in umount */
 }
 
+/* read super block (block 1) and root inode (inode 1) */
 void mount_root(void)
 {
 	int i, free;
-	struct super_block *p;
-	struct m_inode *mi;
+	struct super_block *super;
+	struct m_inode *minode;
 
-	if (32 != sizeof(struct d_inode))
+	if (sizeof(struct d_inode) != 32)
 		panic("bad i-node size");
 
 	for(i = 0; i < NR_FILE; i++)
 		file_table[i].f_count = 0;
-
-	printk("ROOT_DEV: 0x%x\n", ROOT_DEV);
 
 	if (MAJOR(ROOT_DEV) == 2) {
 		printk("Insert root floppy and press ENTER");
 		wait_for_keypress();
 	}
 
-	for(p = &super_block[0]; p < &super_block[NR_SUPER]; p++) {
-		p->s_dev = 0;
-		p->s_lock = 0;
-		p->s_wait = NULL;
+	for(super = &super_block[0]; super < &super_block[NR_SUPER]; super++) {
+		super->s_dev = 0;
+		super->s_lock = 0;
+		super->s_wait = NULL;
 	}
 
-	if (!(p = read_super(ROOT_DEV)))
+	if (!(super = read_super(ROOT_DEV)))
 		panic("Unable to mount root");
 
-	if (!(mi = iget(ROOT_DEV, ROOT_INO)))
+	if (!(minode = iget(ROOT_DEV, ROOT_INO)))
 		panic("Unable to read root i-node");
 
 	/* 
 	 * NOTE! it is logically used 4 times, not 1. 
-	 * 4 times: p->s_isup, p->s_imount, current->pwd, current->root.
-	 * i_count will initial to 1 when iget(), so we need +3 manually*/
-	mi->i_count += 3 ;
-	p->s_isup = p->s_imount = mi;
-	current->pwd = mi;
-	current->root = mi;
+	 * 4 times: super->s_isuper, super->s_imount, current->pwd, current->root.
+	 * i_count will initial to 1 when iget(), so we need +3 manually
+	 */
+	minode->i_count += 3 ;
+	super->s_isuper = super->s_imount = minode;
+	current->pwd = minode;
+	current->root = minode;
 
+	/* ---- show block/inode informations ---- */
 	/* check free block nrs */
 	free = 0;
-	i = p->s_nzones;
+	i = super->s_nzones;
 	while (--i >= 0) {
-		if (!test_bit(i & 8191, p->s_zmap[i >> 13]->b_data))
+		if (!test_bit(i & 8191, super->s_zmap[i >> 13]->b_data))
 			free++;
 	}
-	printk("%d/%d free blocks\n", free, p->s_nzones);
+	printk("%d/%d free blocks\n", free, super->s_nzones);
 
 	/* check free inode nrs */
 	free = 0;
-	i = p->s_ninodes + 1; /* include inode 0 */
+	i = super->s_ninodes + 1; /* include inode 0 */
 	while (--i >= 0) {
-		if (!test_bit(i & 8191, p->s_imap[i >> 13]->b_data))
+		if (!test_bit(i & 8191, super->s_imap[i >> 13]->b_data))
 			free++;
 	}
-	printk("%d/%d free inodes\n", free, p->s_ninodes);
+	printk("%d/%d free inodes\n", free, super->s_ninodes);
 }

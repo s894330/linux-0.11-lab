@@ -186,8 +186,10 @@ int sys_setup(void * BIOS)
 	if (NR_HD)
 		printk("Read partition table%s ok.\n", (NR_HD > 1) ? "s" : "");
 
+	/* currently we don't use ramdisk. Nail 2016/02/22 */
 	ramdisk_load();
 
+	printk("ROOT_DEV: 0x%x\n", ROOT_DEV);
 	printk("Mounting root filesystem...\n");
 	mount_root();
 

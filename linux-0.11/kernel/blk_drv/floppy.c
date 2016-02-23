@@ -85,7 +85,7 @@ static unsigned char reply_buffer[MAX_REPLIES];
  */
 static struct floppy_struct {
 	unsigned int size, sect, head, track, stretch;
-	unsigned char gap,rate,spec1;
+	unsigned char gap, rate, spec1;
 } floppy_type[] = {
 	{    0, 0,0, 0,0,0x00,0x00,0x00 },	/* no testing */
 	{  720, 9,2,40,0,0x2A,0x02,0xDF },	/* 360kB PC diskettes */
@@ -115,7 +115,7 @@ extern char tmp_floppy_area[1024];
  */
 static int cur_spec1 = -1;
 static int cur_rate = -1;
-static struct floppy_struct * floppy = floppy_type;
+static struct floppy_struct *floppy = floppy_type;
 static unsigned char current_drive = 0;
 static unsigned char sector = 0;
 static unsigned char head = 0;
@@ -432,12 +432,14 @@ void do_fd_request(void)
 		reset_floppy();
 		return;
 	}
+
 	if (recalibrate) {
 		recalibrate_floppy();
 		return;
 	}
+
 	CHECK_REQUEST;
-	floppy = (MINOR(CURRENT_REQ->dev)>>2) + floppy_type;
+	floppy = floppy_type + (MINOR(CURRENT_REQ->dev) >> 2);
 	if (current_drive != CURRENT_DEV)
 		seek = 1;
 	current_drive = CURRENT_DEV;

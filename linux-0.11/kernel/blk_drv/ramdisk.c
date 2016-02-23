@@ -17,8 +17,8 @@
 #define MAJOR_NR 1
 #include "blk.h"
 
-char	*rd_start;
-int	rd_length = 0;
+char	*ramdisk_start;
+int	ramdisk_length = 0;
 
 void do_ramdisk_request(void)
 {
@@ -26,22 +26,22 @@ void do_ramdisk_request(void)
 	char	*addr;
 
 	CHECK_REQUEST;
-	addr = rd_start + (CURRENT_REQ->start_sector << 9);
+	addr = ramdisk_start + (CURRENT_REQ->start_sector << 9);
 	len = CURRENT_REQ->nr_sectors << 9;
-	if ((MINOR(CURRENT_REQ->dev) != 1) || (addr+len > rd_start+rd_length)) {
+
+	if ((MINOR(CURRENT_REQ->dev) != 1) ||
+		(addr + len > ramdisk_start + ramdisk_length)) {
 		end_request(0);
 		goto repeat;
 	}
-	if (CURRENT_REQ-> cmd == WRITE) {
-		(void ) memcpy(addr,
-			      CURRENT_REQ->buffer,
-			      len);
-	} else if (CURRENT_REQ->cmd == READ) {
-		(void) memcpy(CURRENT_REQ->buffer, 
-			      addr,
-			      len);
-	} else
+
+	if (CURRENT_REQ-> cmd == WRITE)
+		(void)memcpy(addr, CURRENT_REQ->buffer, len);
+	else if (CURRENT_REQ->cmd == READ)
+		(void)memcpy(CURRENT_REQ->buffer, addr, len);
+	else
 		panic("unknown ramdisk-command");
+
 	end_request(1);
 	goto repeat;
 }
@@ -55,9 +55,9 @@ long ramdisk_init(long mem_start, int length)
 	char	*cp;
 
 	blk_dev[MAJOR_NR].request_fn = DEVICE_REQUEST;
-	rd_start = (char *) mem_start;
-	rd_length = length;
-	cp = rd_start;
+	ramdisk_start = (char *) mem_start;
+	ramdisk_length = length;
+	cp = ramdisk_start;
 	for (i=0; i < length; i++)
 		*cp++ = '\0';
 	return(length);
@@ -77,11 +77,11 @@ void ramdisk_load(void)
 	int nblocks;
 	char *cp;		/* Move pointer */
 	
-	if (!rd_length)
+	if (!ramdisk_length)
 		return;
 
-	printk("Ram disk: %d bytes, starting at 0x%x\n", rd_length,
-		(int)rd_start);
+	printk("Ram disk: %d bytes, starting at 0x%x\n", ramdisk_length,
+		(int)ramdisk_start);
 
 	if (MAJOR(ROOT_DEV) != 2)
 		return;
@@ -102,16 +102,16 @@ void ramdisk_load(void)
 
 	/* get total blocks occupied by MINIX 1.0 filesystem */
 	nblocks = s.s_nzones << s.s_log_zone_size;
-	if (nblocks > (rd_length >> BLOCK_SIZE_BITS)) {
+	if (nblocks > (ramdisk_length >> BLOCK_SIZE_BITS)) {
 		printk("Ram disk image too big!  (%d blocks, %d avail)\n", 
-			nblocks, rd_length >> BLOCK_SIZE_BITS);
+			nblocks, ramdisk_length >> BLOCK_SIZE_BITS);
 		return;
 	}
 
 	/* begin load filesystem into memory */
 	printk("Loading %d bytes into ram disk... 0000k",
 		nblocks << BLOCK_SIZE_BITS);
-	cp = rd_start;
+	cp = ramdisk_start;
 	while (nblocks) {
 		if (nblocks > 2) 
 			bh = breada(ROOT_DEV, block, block + 1, block + 2, -1);
@@ -127,14 +127,14 @@ void ramdisk_load(void)
 		(void)memcpy(cp, bh->b_data, BLOCK_SIZE);
 		brelse(bh);
 
-		/* ascii 011 = <TAB> */
-		printk("\011\011\011\011\011%4dk", i);
+		/* ascii 010 = <backspace> */
+		printk("\010\010\010\010\010%4dk", i);
 		cp += BLOCK_SIZE;
 		block++;
 		nblocks--;
 		i++;
 	}
 
-	printk("\011\011\011\011\011done\n");
+	printk("\010\010\010\010\010done!\n");
 	ROOT_DEV = 0x0101;
 }

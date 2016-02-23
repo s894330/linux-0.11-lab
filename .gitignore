@@ -10,3 +10,4 @@ cscope.*
 .projectVim
 .vimSession
 ctag.files
+bochsout.txt

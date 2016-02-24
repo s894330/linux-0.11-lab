@@ -184,6 +184,7 @@ repeat:
 		if ((*p)->father != current->pid)
 			continue;
 
+		/* now, we found current process's child */
 		if (pid > 0) {
 			if ((*p)->pid != pid)
 				continue;
@@ -196,22 +197,22 @@ repeat:
 		}
 
 		switch ((*p)->state) {
-			case TASK_STOPPED:
-				if (!(options & WUNTRACED))
-					continue;
-				put_fs_long(0x7f, stat_addr);
-				return (*p)->pid;
-			case TASK_ZOMBIE:
-				current->cutime += (*p)->utime;
-				current->cstime += (*p)->stime;
-				flag = (*p)->pid;
-				code = (*p)->exit_code;
-				release(*p);
-				put_fs_long(code, stat_addr);
-				return flag;
-			default:
-				flag = 1;
+		case TASK_STOPPED:
+			if (!(options & WUNTRACED))
 				continue;
+			put_fs_long(0x7f, stat_addr);
+			return (*p)->pid;
+		case TASK_ZOMBIE:
+			current->cutime += (*p)->utime;
+			current->cstime += (*p)->stime;
+			flag = (*p)->pid;
+			code = (*p)->exit_code;
+			release(*p);
+			put_fs_long(code, stat_addr);
+			return flag;
+		default:
+			flag = 1;
+			continue;
 		}
 	}
 
@@ -223,7 +224,7 @@ repeat:
 
 		if (!(current->signal &= ~(1 << (SIGCHLD - 1))))
 			goto repeat;
-		else
+		else	/* got signal during waitpid, directly return */
 			return -EINTR;
 	}
 

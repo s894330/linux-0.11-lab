@@ -210,6 +210,7 @@ void interruptible_sleep_on(struct task_struct **p)
 repeat:	current->state = TASK_INTERRUPTIBLE;
 	schedule();
 
+	//TODO which situation will cause this to true?
 	if (*p && *p != current) {
 		(*p)->state = TASK_RUNNING;
 		goto repeat;

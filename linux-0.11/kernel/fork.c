@@ -25,20 +25,20 @@ long last_pid = 0;
 void verify_area(void *addr, int size)
 {
 	unsigned long start;
-	unsigned long page;
 	int offset;
 
 	start = (unsigned long)addr;
-	offset = size + (start & 0xfff);
-	page = start & 0xfffff000;
+	offset = (start & 0xfff) + size;
+	start &= 0xfffff000;
 
 	/* change page addr to linear addr */
-	page += get_base(current->ldt[2]);
+	start += get_base(current->ldt[2]);
 
+	/* verify one page(4KB) each time */
 	while (offset > 0) {
 		offset -= 4096;
-		write_verify(page);
-		page += 4096;
+		write_verify(start);
+		start += 0x1000;    /* move to next page table entry */
 	}
 }
 

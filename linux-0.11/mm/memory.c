@@ -276,25 +276,26 @@ unsigned long put_page(unsigned long page, unsigned long address)
 	return page;
 }
 
-void un_wp_page(unsigned long *table_entry)
+void un_wp_page(unsigned long *page_addr)
 {
 	unsigned long old_page, new_page;
 
 	/* if page is not shared (memory_map[] = 1), change property to R/W */
-	old_page = 0xfffff000 & *table_entry;
+	old_page = 0xfffff000 & *page_addr;
 	if (old_page >= LOW_MEM && memory_map[MAP_NR(old_page)] == 1) {
-		*table_entry |= 2;
+		*page_addr |= 2;
 		refresh_TLB();
 		return;
 	}
 
+	/* mamory page is shread with other process, need create new one */
 	if (!(new_page = get_free_page()))
 		oom();
 
 	if (old_page >= LOW_MEM)
 		memory_map[MAP_NR(old_page)]--;
 
-	*table_entry = new_page | 7;
+	*page_addr = new_page | 7;
 	refresh_TLB();
 	copy_page(old_page, new_page);
 }	
@@ -326,7 +327,7 @@ void do_wp_page(unsigned long error_code, unsigned long address)
 
 void write_verify(unsigned long address)
 {
-	unsigned long pgt_addr;
+	unsigned long pgt_addr;	/* page table address */
 	unsigned long page_addr;
 
 	pgt_addr = *((unsigned long *)((address >> 22) * 4));

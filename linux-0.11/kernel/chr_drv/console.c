@@ -505,14 +505,14 @@ void console_write(struct tty_struct *tty)
 			else if (c == '8')
 				restore_cur();
 			break;
-		case 2:	/* enter this case if previous 2 char is <Esc> + [ */
+		case 2:	/* enter this case if previous 2 char is <Esc>[ */
 			for(npar = 0; npar < NPAR; npar++)
 				par[npar] = 0;
 			npar = 0;
 			state = 3;
 			if ((ques = (c == '?')))
 				break;
-		case 3:
+		case 3: /* enter this case if previous state is state 2 */
 			if (c == ';' && npar < NPAR - 1) {
 				npar++;
 				break;

@@ -154,7 +154,8 @@ void start_kernel(void)	/* This really IS void, no error here. */
 	sti();
 	move_to_user_mode();
 
-	/* now we are under task0's user process context */
+	/* ---- now we are under task0's user process context ---- */
+
 	if (!fork())	/* we count on this going ok */
 		init();
 
@@ -178,6 +179,7 @@ static int printf(const char *fmt, ...)
 	i = vsprintf(printbuf, fmt, args)
 	va_end(args);
 
+	/* write string to stdout(fd 1) */
 	write(1, printbuf, i);
 
 	return i;
@@ -189,6 +191,7 @@ static char *envp_rc[] = {"HOME=/", NULL};
 static char *argv[] = {"-/bin/sh", NULL};
 static char *envp[] = {"HOME=/usr/root", NULL};
 
+/* task1's main function */
 void init(void)
 {
 	int pid, stat;
@@ -206,15 +209,18 @@ void init(void)
 	(void)open("/dev/tty0", O_RDWR, 0);
 	(void)dup(0);	/* duplicate fd 0 to fd 1(stdout) */
 	(void)dup(0);	/* duplicate fd 0 to fd 2(stderr) */
+
 	printf("%d buffer_head = %d bytes buffer space\n", NR_BUFFERS,
 		NR_BUFFERS * BLOCK_SIZE);
 	printf("Total available memory: %d bytes\n", memory_end - memory_start);
 
 	if (!(pid = fork())) {
+		/* ---- this is task2's context ---- */
 		/* redirect stdin(fd 0) to /etc/rc */
 		close(0);		
 		if (open("/etc/rc", O_RDONLY, 0))
 			_exit(1);
+
 		execve("/bin/sh", argv_rc, envp_rc);
 		_exit(2);
 	}
@@ -224,7 +230,7 @@ void init(void)
 			/* nothing */;
 	}
 
-	/* child process pid 2 has died, re-create it */
+	/* child process pid 2(task2) has died, re-create it */
 	while (1) {
 		if ((pid = fork()) < 0) {
 			printf("Fork failed in init\n");
@@ -242,9 +248,10 @@ void init(void)
 			_exit(execve("/bin/sh", argv, envp));
 		}
 
-		while (1)
+		while (1) {
 			if (pid == wait(&stat))
 				break;
+		}
 		printf("\nchild %d died with code %04x\n", pid, stat);
 		sync();
 	}

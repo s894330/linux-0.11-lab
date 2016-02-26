@@ -94,9 +94,9 @@ static int count(char **argv)
 }
 
 /*
- * 'copy_string()' copies argument/envelope strings from user
- * memory to free pages in kernel mem. These are in a format ready
- * to be put directly into the top of new user memory.
+ * 'copy_string()' copies argument/envelope strings from user memory to
+ * free pages in kernel memory. These are in a format ready to be put directly
+ * into the top of new user memory.
  *
  * Modified by TYT, 11/24/91 to add the from_kmem argument, which specifies
  * whether the string and the string array are from user or kernel segments:
@@ -126,7 +126,9 @@ static unsigned long copy_strings(int argc, char **argv, unsigned long *page,
 	if (from_kmem == 2)
 		set_fs(new_fs);
 
-	while (argc-- > 0) {
+	/* copy parameters one by one, start from last parameter */
+	while (argc > 0) {
+		argc--;
 		if (from_kmem == 1)
 			set_fs(new_fs);
 
@@ -137,6 +139,7 @@ static unsigned long copy_strings(int argc, char **argv, unsigned long *page,
 		if (from_kmem == 1)
 			set_fs(old_fs);
 
+		/* calculate parameter lenght */
 		len = 0;		/* remember zero-padding */
 		do {
 			len++;
@@ -147,8 +150,13 @@ static unsigned long copy_strings(int argc, char **argv, unsigned long *page,
 			return 0;
 		}
 
+		/* copy parameter char by char, start from last char */
 		while (len) {
 			--p; --tmp; --len;
+			/* 
+			 * check if we alreay fill out PAGE_SIZE data, thus need
+			 * to change to next page
+			 */
 			if (--offset < 0) {
 				offset = p % PAGE_SIZE;
 				if (from_kmem == 2)
@@ -223,7 +231,7 @@ int do_execve(unsigned long *eip, long tmp, char *filename, char **argv,
 	if ((0xffff & eip[1]) != 0x000f)
 		panic("execve called from supervisor mode");
 
-	for (i = 0; i < MAX_ARG_PAGES; i++)	/* clear page-table */
+	for (i = 0; i < MAX_ARG_PAGES; i++)
 		page[i] = 0;
 
 	if (!(inode = namei(filename)))		/* get executables inode */
@@ -233,28 +241,36 @@ int do_execve(unsigned long *eip, long tmp, char *filename, char **argv,
 	envc = count(envp);
 	
 restart_interp:
+	/* ---- check inode property first ---- */
 	if (!S_ISREG(inode->i_mode)) {	/* must be regular file */
 		retval = -EACCES;
 		goto exec_error2;
 	}
 
+	/* 
+	 * if S_ISUID is set, normal uesr can execute privilege user's program,
+	 * ths same meaning of S_ISGID
+	 */
 	i = inode->i_mode;
 	e_uid = (i & S_ISUID) ? inode->i_uid : current->euid;
 	e_gid = (i & S_ISGID) ? inode->i_gid : current->egid;
 
-	if (current->euid == inode->i_uid)
-		i >>= 6;
-	else if (current->egid == inode->i_gid)
-		i >>= 3;
-
 	/* check if has right to execute */
-	if (!(i & 1) &&
-		!((inode->i_mode & 0111) && suser())) {
+	if (inode->i_uid == current->euid)  /* file belong current user */
+		i >>= 6;
+	else if (inode->i_gid == current->egid)	/* file belong current group */
+		i >>= 3;
+	else	/* file belong others */
+		/* nothing */ ;
+
+	/* only file with "x" or root user and mode has "x" can execute file */
+	if (!(i & 1) && !((inode->i_mode & 0111) && suser())) {
 		retval = -ENOEXEC;
 		goto exec_error2;
 	}
 
-	/* read first block data of file */
+	/* ---- check file header second ---- */
+	/* read first data block of file */
 	if (!(bh = bread(inode->i_dev, inode->i_zone[0]))) {
 		retval = -EACCES;
 		goto exec_error2;
@@ -347,6 +363,7 @@ restart_interp:
 		goto exec_error2;
 	}
 
+	/* TODO need to understand the meaning of N_TXTOFF */
 	if (N_TXTOFF(ex) != BLOCK_SIZE) {
 		printk("%s: N_TXTOFF != BLOCK_SIZE. See a.out.h.", filename);
 		retval = -ENOEXEC;
@@ -367,16 +384,17 @@ restart_interp:
 		iput(current->executable);
 	current->executable = inode;
 
+	/* init sa_handler to NULL */
 	for (i = 0; i < NSIG; i++) {
 		if (current->sigaction[i].sa_handler != SIG_IGN)
 			current->sigaction[i].sa_handler = NULL;
 	}
 
+	/* close previous fd according to "close_on_exec" bitmap */
 	for (i = 0; i < NR_OPEN; i++) {
 		if ((current->close_on_exec >> i) & 1)
 			sys_close(i);
 	}
-
 	current->close_on_exec = 0;
 
 	free_page_tables(get_base(current->ldt[1]), get_limit(0x0f));
@@ -386,12 +404,12 @@ restart_interp:
 		last_task_used_math = NULL;
 	current->used_math = 0;
 
-	p += change_ldt(ex.a_text, page) - MAX_ARG_PAGES * PAGE_SIZE;
+	p += change_ldt(ex.a_text, page) - PAGE_SIZE * MAX_ARG_PAGES;
 	p = (unsigned long)create_tables((char *)p, argc, envc);
 
-	current->brk = ex.a_bss +
-		(current->end_data = ex.a_data +
-		(current->end_code = ex.a_text));
+	current->end_code = ex.a_text;
+	current->end_data = ex.a_text + ex.a_data;
+	current->brk = ex.a_text + ex.a_data + ex.a_bss;
 	current->start_stack = p & 0xfffff000;
 	current->euid = e_uid;
 	current->egid = e_gid;

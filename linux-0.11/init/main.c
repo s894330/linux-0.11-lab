@@ -216,7 +216,10 @@ void init(void)
 
 	if (!(pid = fork())) {
 		/* ---- this is task2's context ---- */
-		/* redirect stdin(fd 0) to /etc/rc */
+		/* 
+		 * redirect stdin(fd 0) to /etc/rc which will be used by
+		 * /bin/sh
+		 */
 		close(0);		
 		if (open("/etc/rc", O_RDONLY, 0))
 			_exit(1);
@@ -225,6 +228,7 @@ void init(void)
 		_exit(2);
 	}
 
+	/* let task1 wait task2 die */
 	if (pid > 0) {
 		while (pid != wait(&stat))
 			/* nothing */;

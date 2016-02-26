@@ -207,7 +207,7 @@ timer_interrupt:
 
 .align 4
 sys_execve:
-	lea EIP(%esp), %eax
+	lea EIP(%esp), %eax	/* load address of EIP(%esp) into eax */
 	pushl %eax
 	call do_execve
 	addl $4, %esp

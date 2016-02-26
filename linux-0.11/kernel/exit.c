@@ -217,6 +217,10 @@ repeat:
 	}
 
 	if (flag) {
+		/* 
+		 * if WNOHANG is set, means we should directly return if no
+		 * child process is at stopped/zombie state
+		 */
 		if (options & WNOHANG)
 			return 0;
 		current->state = TASK_INTERRUPTIBLE;

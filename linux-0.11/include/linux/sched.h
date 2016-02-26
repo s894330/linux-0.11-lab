@@ -93,6 +93,11 @@ struct task_struct {
 	int exit_code;
 	unsigned long start_code, end_code, end_data, brk, start_stack;
 	long pid, father, pgrp, session, leader;
+	/* 
+	 * uid: user id which own this process
+	 * euid: id which used for file access
+	 * suid: temp saved uid
+	 */
 	unsigned short uid, euid, suid;
 	unsigned short gid, egid, sgid;
 	long alarm;

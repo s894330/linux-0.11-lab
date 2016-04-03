@@ -235,5 +235,5 @@ int vsprintf(char *buf, const char *fmt, va_list args)
 		}
 	}
 	*str = '\0';
-	return str-buf;
+	return str - buf;
 }

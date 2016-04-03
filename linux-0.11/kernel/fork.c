@@ -25,20 +25,20 @@ long last_pid = 0;
 void verify_area(void *addr, int size)
 {
 	unsigned long start;
-	unsigned long page;
 	int offset;
 
 	start = (unsigned long)addr;
-	offset = size + (start & 0xfff);
-	page = start & 0xfffff000;
+	offset = (start & 0xfff) + size;
+	start &= 0xfffff000;
 
 	/* change page addr to linear addr */
-	page += get_base(current->ldt[2]);
+	start += get_base(current->ldt[2]);
 
+	/* verify one page(4KB) each time */
 	while (offset > 0) {
 		offset -= 4096;
-		write_verify(page);
-		page += 4096;
+		write_verify(start);
+		start += 0x1000;    /* move to next page table entry */
 	}
 }
 
@@ -59,11 +59,13 @@ int copy_mem(int nr, struct task_struct *p)
 	if (data_limit < code_limit)
 		panic("Bad data_limit");
 
+	/* set newly create process's new code/data base */
 	new_data_base = new_code_base = nr * 0x4000000;	/* 0x4000000 = 64MB */
 	p->start_code = new_code_base;
 	set_base(p->ldt[1], new_code_base);
 	set_base(p->ldt[2], new_data_base);
 
+	/* copy page table and setup it according to new data base */
 	if (copy_page_tables(old_data_base, new_data_base, data_limit)) {
 		printk("free_page_tables: from copy_mem\n");
 		free_page_tables(new_data_base, data_limit);
@@ -111,7 +113,7 @@ int copy_process(int nr, long ebp, long edi, long esi, long gs, long none,
 
 	/* refine tss data */
 	p->tss.back_link = 0;
-	p->tss.esp0 = PAGE_SIZE + (long)p;  /* esp = end of new allocate page */
+	p->tss.esp0 = (long)p + PAGE_SIZE;  /* esp = end of new allocate page */
 	p->tss.ss0 = KERNEL_DATA_SEG;
 	p->tss.eip = eip;
 	p->tss.eflags = eflags;
@@ -137,15 +139,18 @@ int copy_process(int nr, long ebp, long edi, long esi, long gs, long none,
 	if (last_task_used_math == current)
 		__asm__("clts; fnsave %0"::"m" (p->tss.i387));
 
+	/* setup page dir table and page table */
 	if (copy_mem(nr, p)) {
 		task[nr] = NULL;
 		free_page((long)p);
 		return -EAGAIN;
 	}
 
-	for (i = 0; i < NR_OPEN; i++)
+	for (i = 0; i < NR_OPEN; i++) {
 		if ((f = p->filp[i]))
 			f->f_count++;
+	}
+
 	if (current->pwd)
 		current->pwd->i_count++;
 	if (current->root)
@@ -153,21 +158,23 @@ int copy_process(int nr, long ebp, long edi, long esi, long gs, long none,
 	if (current->executable)
 		current->executable->i_count++;
 
-	set_tss_desc(gdt + (nr << 1) + FIRST_TSS_ENTRY, &(p->tss));
-	set_ldt_desc(gdt + (nr << 1) + FIRST_LDT_ENTRY, &(p->ldt));
+	/* setup task nr's TSS and LDS into gdt */
+	set_tss_desc(gdt + FIRST_TSS_ENTRY + nr * 2, &(p->tss));
+	set_ldt_desc(gdt + FIRST_LDT_ENTRY + nr * 2, &(p->ldt));
 
 	p->state = TASK_RUNNING;	/* do this last, just in case */
 
 	return last_pid;
 }
 
+/* find least unused pid and first unused task[] */
 int find_empty_process(void)
 {
 	int i;
 
 repeat:
 	if ((++last_pid) < 0)
-		last_pid=1;
+		last_pid = 1;
 
 	/* loop check if there is any task already using last_pid */
 	for(i = 0; i < NR_TASKS; i++)

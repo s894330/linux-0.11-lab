@@ -26,6 +26,7 @@ static int dupfd(unsigned int fd, unsigned int arg)
 	if (arg >= NR_OPEN)
 		return -EINVAL;
 
+	/* find first unused filp[] item */
 	while (arg < NR_OPEN) {
 		if (current->filp[arg])
 			arg++;

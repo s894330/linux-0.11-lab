@@ -29,24 +29,24 @@
 #define _I_FLAG(tty,f)	((tty)->termios.c_iflag & f)
 #define _O_FLAG(tty,f)	((tty)->termios.c_oflag & f)
 
-#define L_CANON(tty)	_L_FLAG((tty),ICANON)
-#define L_ISIG(tty)	_L_FLAG((tty),ISIG)
-#define L_ECHO(tty)	_L_FLAG((tty),ECHO)
-#define L_ECHOE(tty)	_L_FLAG((tty),ECHOE)
-#define L_ECHOK(tty)	_L_FLAG((tty),ECHOK)
-#define L_ECHOCTL(tty)	_L_FLAG((tty),ECHOCTL)
-#define L_ECHOKE(tty)	_L_FLAG((tty),ECHOKE)
+#define L_CANON(tty)	_L_FLAG((tty), ICANON)
+#define L_ISIG(tty)	_L_FLAG((tty), ISIG)
+#define L_ECHO(tty)	_L_FLAG((tty), ECHO)
+#define L_ECHOE(tty)	_L_FLAG((tty), ECHOE)
+#define L_ECHOK(tty)	_L_FLAG((tty), ECHOK)
+#define L_ECHOCTL(tty)	_L_FLAG((tty), ECHOCTL)
+#define L_ECHOKE(tty)	_L_FLAG((tty), ECHOKE)
 
-#define I_UCLC(tty)	_I_FLAG((tty),IUCLC)
-#define I_NLCR(tty)	_I_FLAG((tty),INLCR)
-#define I_CRNL(tty)	_I_FLAG((tty),ICRNL)
-#define I_NOCR(tty)	_I_FLAG((tty),IGNCR)
+#define I_UCLC(tty)	_I_FLAG((tty), IUCLC)
+#define I_NLCR(tty)	_I_FLAG((tty), INLCR)
+#define I_CRNL(tty)	_I_FLAG((tty), ICRNL)
+#define I_NOCR(tty)	_I_FLAG((tty), IGNCR)
 
-#define O_POST(tty)	_O_FLAG((tty),OPOST)
-#define O_NLCR(tty)	_O_FLAG((tty),ONLCR)
-#define O_CRNL(tty)	_O_FLAG((tty),OCRNL)
-#define O_NLRET(tty)	_O_FLAG((tty),ONLRET)
-#define O_LCUC(tty)	_O_FLAG((tty),OLCUC)
+#define O_POST(tty)	_O_FLAG((tty), OPOST)
+#define O_NLCR(tty)	_O_FLAG((tty), ONLCR)
+#define O_CRNL(tty)	_O_FLAG((tty), OCRNL)
+#define O_NLRET(tty)	_O_FLAG((tty), ONLRET)
+#define O_LCUC(tty)	_O_FLAG((tty), OLCUC)
 
 struct tty_struct tty_table[] = {
 	{	/* console */
@@ -308,13 +308,12 @@ int tty_write(unsigned channel, char *buf, int count)
 
 	while (count > 0) {
 		sleep_if_full(&tty->write_q);
-
 		if (current->signal)
 			break;
 
+		/* put all characters into write_q */
 		while (count > 0 && !FULL(tty->write_q)) {
 			c = get_fs_byte(b);
-
 			if (O_POST(tty)) {
 				if (c =='\r' && O_CRNL(tty))
 					c='\n';
@@ -323,22 +322,20 @@ int tty_write(unsigned channel, char *buf, int count)
 
 				if (c == '\n' && !cr_flag && O_NLCR(tty)) {
 					cr_flag = 1;
-					PUTCH(13, tty->write_q);
+					PUTCH(13, tty->write_q);    /* 13: CR */
 					continue;
 				}
-
 				if (O_LCUC(tty))
 					c = toupper(c);
 			}
-
 			b++;
 			count--;
 			cr_flag = 0;
 			PUTCH(c, tty->write_q);
 		}
-
 		tty->write(tty);
-		if (count > 0)
+
+		if (count > 0)	/* write_q is full, wait a minute */
 			schedule();
 	}
 

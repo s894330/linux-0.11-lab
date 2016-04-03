@@ -85,7 +85,7 @@ static unsigned char reply_buffer[MAX_REPLIES];
  */
 static struct floppy_struct {
 	unsigned int size, sect, head, track, stretch;
-	unsigned char gap,rate,spec1;
+	unsigned char gap, rate, spec1;
 } floppy_type[] = {
 	{    0, 0,0, 0,0,0x00,0x00,0x00 },	/* no testing */
 	{  720, 9,2,40,0,0x2A,0x02,0xDF },	/* 360kB PC diskettes */
@@ -115,7 +115,7 @@ extern char tmp_floppy_area[1024];
  */
 static int cur_spec1 = -1;
 static int cur_rate = -1;
-static struct floppy_struct * floppy = floppy_type;
+static struct floppy_struct *floppy = floppy_type;
 static unsigned char current_drive = 0;
 static unsigned char sector = 0;
 static unsigned char head = 0;
@@ -162,13 +162,13 @@ __asm__("cld; rep; movsl" \
 
 static void setup_DMA(void)
 {
-	long addr = (long) CURRENT->buffer;
+	long addr = (long) CURRENT_REQ->buffer;
 
 	cli();
 	if (addr >= 0x100000) {
 		addr = (long) tmp_floppy_area;
 		if (command == FD_WRITE)
-			copy_buffer(CURRENT->buffer,tmp_floppy_area);
+			copy_buffer(CURRENT_REQ->buffer,tmp_floppy_area);
 	}
 /* mask DMA 2 */
 	immoutb_p(4|2,10);
@@ -240,12 +240,12 @@ static int result(void)
 
 static void bad_flp_intr(void)
 {
-	CURRENT->errors++;
-	if (CURRENT->errors > MAX_ERRORS) {
+	CURRENT_REQ->errors++;
+	if (CURRENT_REQ->errors > MAX_ERRORS) {
 		floppy_deselect(current_drive);
 		end_request(0);
 	}
-	if (CURRENT->errors > MAX_ERRORS/2)
+	if (CURRENT_REQ->errors > MAX_ERRORS/2)
 		reset = 1;
 	else
 		recalibrate = 1;
@@ -267,8 +267,8 @@ static void rw_interrupt(void)
 		do_fd_request();
 		return;
 	}
-	if (command == FD_READ && (unsigned long)(CURRENT->buffer) >= 0x100000)
-		copy_buffer(tmp_floppy_area,CURRENT->buffer);
+	if (command == FD_READ && (unsigned long)(CURRENT_REQ->buffer) >= 0x100000)
+		copy_buffer(tmp_floppy_area,CURRENT_REQ->buffer);
 	floppy_deselect(current_drive);
 	end_request(1);
 	do_fd_request();
@@ -432,16 +432,18 @@ void do_fd_request(void)
 		reset_floppy();
 		return;
 	}
+
 	if (recalibrate) {
 		recalibrate_floppy();
 		return;
 	}
-	INIT_REQUEST;
-	floppy = (MINOR(CURRENT->dev)>>2) + floppy_type;
+
+	CHECK_REQUEST;
+	floppy = floppy_type + (MINOR(CURRENT_REQ->dev) >> 2);
 	if (current_drive != CURRENT_DEV)
 		seek = 1;
 	current_drive = CURRENT_DEV;
-	block = CURRENT->sector;
+	block = CURRENT_REQ->start_sector;
 	if (block+2 > floppy->size) {
 		end_request(0);
 		goto repeat;
@@ -454,9 +456,9 @@ void do_fd_request(void)
 	if (seek_track != current_track)
 		seek = 1;
 	sector++;
-	if (CURRENT->cmd == READ)
+	if (CURRENT_REQ->cmd == READ)
 		command = FD_READ;
-	else if (CURRENT->cmd == WRITE)
+	else if (CURRENT_REQ->cmd == WRITE)
 		command = FD_WRITE;
 	else
 		panic("do_fd_request: unknown command");

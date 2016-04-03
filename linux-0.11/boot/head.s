@@ -18,7 +18,7 @@ KERNEL_DATA_SEG = 0x10 	# selector of kernel data seg.
 .global idt, gdt, pg_dir, tmp_floppy_area, startup_32
 
 .text
-pg_dir:
+pg_dir:	    # address of page dir table is at 0x0
 startup_32:
 	movl	$KERNEL_DATA_SEG, %eax	# let ds,es,fs,gs has the same segment
 	mov 	%ax, %ds
@@ -279,9 +279,9 @@ gdt_descr:
 idt:	.fill 256, 8, 0		# idt table, will initialize at setup_idt func
 
 gdt:	.quad 0x0000000000000000	/* NULL descriptor */
-	/* 16MB kernel code size from 0x0, DPL 0 */
+	/* 16MB kernel R/E code size from 0x0, DPL 0 */
 	.quad 0x00c09a0000000fff
-	/* 16MB kernel data size from 0x0, DPL 0 */
+	/* 16MB kernel R/W data size from 0x0, DPL 0 */
 	.quad 0x00c0920000000fff
 	.quad 0x0000000000000000	/* TEMPORARY - don't use */
 	.fill 252, 8, 0			/* space for LDT's and TSS's etc */

@@ -93,6 +93,11 @@ struct task_struct {
 	int exit_code;
 	unsigned long start_code, end_code, end_data, brk, start_stack;
 	long pid, father, pgrp, session, leader;
+	/* 
+	 * uid: user id which own this process
+	 * euid: id which used for file access
+	 * suid: temp saved uid
+	 */
 	unsigned short uid, euid, suid;
 	unsigned short gid, egid, sgid;
 	long alarm;
@@ -160,8 +165,8 @@ struct task_struct {
 	.ldt = { \
 		{0, 0}, \
 		/* len limit, property */ \
-		{0x009f, 0x00c0fa00}, /* 640KB len, R/E code seg. DPL 3 */ \
-		{0x009f, 0x00c0f200}, /* 640KB len, R/W data seg. DPL 3 */ \
+		{0x009f, 0x00c0fa00}, /* 640KB len, R/E code seg. from 0x0, DPL 3 */ \
+		{0x009f, 0x00c0f200}, /* 640KB len, R/W data seg. from 0x0, DPL 3 */ \
 	}, \
 	.tss = { \
 		.back_link = 0, \
@@ -245,15 +250,16 @@ __asm__("str %%ax\n\t" \
 /* 
  * __tmp is used for "ljmp" which need 4 byte offset(long a) and 2 byte
  * selector (low 2 byte of long b), when "ljmp" to new task, the offset (long a)
- * is not used, just selector is used
+ * is not used, just selector(long b) is used
  */ \
 struct {long a, b;} __tmp; \
 __asm__("cmpl %%ecx, current\n\t" \
 	"je 1f\n\t" \
 	"movw %%dx, %1\n\t" \
-	"xchgl %%ecx, current\n\t" \
-	"ljmp *%0\n\t" \
-	"cmpl %%ecx, last_task_used_math\n\t" \
+	"xchgl %%ecx, current\n\t" /* ecx = current task, current = new task */ \
+	"ljmp *%0\n\t" /* switch to new task */ \
+	/* bellow code will be execute only at task switch back to */ \
+	"cmpl %%ecx, last_task_used_math\n\t" /* if task using math, clear TS flag */ \
 	"jne 1f\n\t" \
 	"clts\n\t" \
 	"1:" \

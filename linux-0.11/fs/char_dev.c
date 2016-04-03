@@ -24,11 +24,11 @@ static int rw_ttyx(int rw, unsigned minor, char *buf, int count, off_t *pos)
 		tty_read(minor, buf, count) : tty_write(minor, buf, count));
 }
 
-static int rw_tty(int rw,unsigned minor,char * buf,int count, off_t * pos)
+static int rw_tty(int rw, unsigned minor, char *buf, int count, off_t *pos)
 {
-	if (current->tty<0)
+	if (current->tty < 0)
 		return -EPERM;
-	return rw_ttyx(rw,current->tty,buf,count,pos);
+	return rw_ttyx(rw, current->tty, buf, count, pos);
 }
 
 static int rw_ram(int rw,char * buf, int count, off_t *pos)
@@ -80,8 +80,6 @@ static int rw_memory(int rw, unsigned minor, char * buf, int count, off_t * pos)
 	}
 }
 
-#define NRDEVS ((sizeof(crw_table)) / (sizeof(crw_ptr)))
-
 static crw_ptr crw_table[] = {
 	NULL,		/* nodev */
 	rw_memory,	/* /dev/mem etc */
@@ -92,6 +90,8 @@ static crw_ptr crw_table[] = {
 	NULL,		/* /dev/lp */
 	NULL		/* unnamed pipes */
 };
+
+#define NRDEVS ((sizeof(crw_table)) / (sizeof(crw_ptr)))
 
 int rw_char(int rw, int dev, char *buf, int count, off_t *pos)
 {

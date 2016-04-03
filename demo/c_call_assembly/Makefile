@@ -3,4 +3,4 @@ all:
 	gcc -o caller caller.c callee.o
 	./caller
 clean:
-	rm -rf caller.o caller
+	rm -rf caller.o callee.o caller

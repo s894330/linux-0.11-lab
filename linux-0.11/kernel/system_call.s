@@ -91,7 +91,7 @@ system_call:
 	movl $0x10, %edx	# set up ds,es to kernel data space
 	mov %dx, %ds
 	mov %dx, %es
-	movl $0x17, %edx	# fs points to local data space
+	movl $0x17, %edx	# fs points to local user data space
 	mov %dx, %fs
 	call *sys_call_table(, %eax, 4) # sys_call_table + %eax * 4
 	pushl %eax		# save return value
@@ -107,10 +107,12 @@ ret_from_sys_call:
 	movl current, %eax	# task[0] cannot have signals
 	cmpl task, %eax
 	je 3f
-	cmpw $0x0f, CS(%esp)	# was old code segment supervisor ?
-	jne 3f
-	cmpw $0x17, OLDSS(%esp)	# was stack segment = 0x17 ?
-	jne 3f
+	cmpw $0x08, CS(%esp)	# was old code segment supervisor ?
+	je 3f
+	cmpw $0x10, OLDSS(%esp)	# was old stack segment supervisor ?
+	je 3f
+
+	# previous task is user task, need check signal after system_call
 	movl signal(%eax), %ebx
 	movl blocked(%eax), %ecx
 	notl %ecx
@@ -181,31 +183,31 @@ device_not_available:
 
 .align 4
 timer_interrupt:
-	push %ds		# save ds,es and put kernel data space
-	push %es		# into them. %fs is used by _system_call
+	push %ds		# save ds, es and put kernel data space
+	push %es		# into them. %fs is used by system_call
 	push %fs
-	pushl %edx		# we save %eax,%ecx,%edx as gcc doesn't
+	pushl %edx		# we save %eax, %ecx, %edx as gcc doesn't
 	pushl %ecx		# save those across function calls. %ebx
 	pushl %ebx		# is saved as we use that in ret_sys_call
 	pushl %eax
-	movl $0x10,%eax
-	mov %ax,%ds
-	mov %ax,%es
-	movl $0x17,%eax
-	mov %ax,%fs
+	movl $0x10, %eax
+	mov %ax, %ds
+	mov %ax, %es
+	movl $0x17, %eax
+	mov %ax, %fs
 	incl jiffies
-	movb $0x20,%al		# EOI to interrupt controller #1
-	outb %al,$0x20
-	movl CS(%esp),%eax
-	andl $3,%eax		# %eax is CPL (0 or 3, 0=supervisor)
+	movb $0x20, %al		# EOI to interrupt controller #1
+	outb %al, $0x20
+	movl CS(%esp), %eax
+	andl $3, %eax		# %eax is CPL (0 or 3, 0 = supervisor)
 	pushl %eax
 	call do_timer		# 'do_timer(long CPL)' does everything from
-	addl $4,%esp		# task switching to accounting ...
+	addl $4, %esp		# task switching to accounting ...
 	jmp ret_from_sys_call
 
 .align 4
 sys_execve:
-	lea EIP(%esp), %eax
+	lea EIP(%esp), %eax	/* load address of EIP(%esp) into eax */
 	pushl %eax
 	call do_execve
 	addl $4, %esp
@@ -213,7 +215,7 @@ sys_execve:
 
 .align 4
 sys_fork:
-	call find_empty_process
+	call find_empty_process	# first unused index of task[] will stored in eax
 	testl %eax, %eax
 	js 1f			# if eax < 0, jump
 	push %gs
@@ -237,18 +239,24 @@ hd_interrupt:
 	mov %ax, %es
 	movl $0x17, %eax	# fs = task data seg.
 	mov %ax, %fs
+
 	movb $0x20, %al
 	outb %al, $0xa0		# EOI to interrupt controller 8259A slave
+
 	jmp 1f			# give port chance to breathe
 1:	jmp 1f
+
 1:	xorl %edx, %edx
-	xchgl do_hd, %edx
+	xchgl do_hd, %edx	# clean do_hd function pointer
 	testl %edx, %edx	# test if edx is NULL
 	jne 1f
 	movl $unexpected_hd_interrupt, %edx
+
 1:	outb %al, $0x20		# EOI to interrupt controller 8259A master to
 				# end interrupt
+
 	call *%edx		# "interesting" way of handling intr.
+
 	pop %fs
 	pop %es
 	pop %ds

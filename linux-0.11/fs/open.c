@@ -154,7 +154,7 @@ int sys_open(const char *filename, int flag, int mode)
 	/* default not close this fd when child do exec() */
 	current->close_on_exec &= ~(1 << fd);
 
-	/* find free struct file in file_table[] */
+	/* find free struct file in global file_table[] */
 	f = file_table;
 	for (i = 0; i < NR_FILE; i++, f++) {
 		if (!f->f_count)
@@ -163,11 +163,13 @@ int sys_open(const char *filename, int flag, int mode)
 	if (i >= NR_FILE)
 		return -EINVAL;
 
+	/* setup filp[fd] */
 	f->f_count++;
 	current->filp[fd] = f;
 
 	/* 
-	 * if open filename success, inode correspoind to this file's inode data
+	 * find the <filename>'s inode after last '/'.
+	 * ex: if <filename> is "/dev/tty0", then i is the inode of file <tty0>
 	 */
 	if ((i = open_namei(filename, flag, mode, &inode)) < 0) {
 		current->filp[fd] = NULL;
@@ -175,7 +177,7 @@ int sys_open(const char *filename, int flag, int mode)
 		return i;
 	}
 
-	/* ttys are somewhat special (ttyxx major==4, tty major==5) */
+	/* ttys are somewhat special (ttyxx major == 4, tty major == 5) */
 	if (S_ISCHR(inode->i_mode)) {
 		if (MAJOR(inode->i_zone[0]) == 4) {
 			if (current->leader && current->tty < 0) {

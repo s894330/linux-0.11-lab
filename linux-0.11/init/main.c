@@ -53,7 +53,7 @@ extern void char_dev_init(void);
 extern void hd_init(void);
 extern void floppy_init(void);
 extern void memory_init(long start, long end);
-extern long rd_init(long mem_start, int length);
+extern long ramdisk_init(long mem_start, int length);
 extern long kernel_mktime(struct tm * tm);
 extern long startup_time;
 
@@ -103,6 +103,10 @@ static long memory_end = 0;
 static long buffer_memory_end = 0;
 static long memory_start = 0;
 
+/* 
+ * each hard disk param table is 16byte, so hd_info can store 2 hd param table
+ * data
+ */
 static struct hd_info {
 	char dummy[32];
 } hd_info;
@@ -131,7 +135,7 @@ void start_kernel(void)	/* This really IS void, no error here. */
 
 	memory_start = buffer_memory_end;
 #ifdef RAMDISK	/* currently we don't use ramdisk. Nail 2016/2/4 */
-	memory_start += rd_init(memory_start, RAMDISK * 1024);
+	memory_start += ramdisk_init(memory_start, RAMDISK * 1024);
 #endif
 	memory_init(memory_start, memory_end);
 	trap_init();
@@ -150,7 +154,8 @@ void start_kernel(void)	/* This really IS void, no error here. */
 	sti();
 	move_to_user_mode();
 
-	/* now we are under task0's user process context */
+	/* ---- now we are under task0's user process context ---- */
+
 	if (!fork())	/* we count on this going ok */
 		init();
 
@@ -174,6 +179,7 @@ static int printf(const char *fmt, ...)
 	i = vsprintf(printbuf, fmt, args)
 	va_end(args);
 
+	/* write string to stdout(fd 1) */
 	write(1, printbuf, i);
 
 	return i;
@@ -185,11 +191,13 @@ static char *envp_rc[] = {"HOME=/", NULL};
 static char *argv[] = {"-/bin/sh", NULL};
 static char *envp[] = {"HOME=/usr/root", NULL};
 
+/* task1's main function */
 void init(void)
 {
 	int pid, stat;
 
 	setup((void *)&hd_info);
+
 	/* 
 	 * cast unused return value to void is to explicitly show other
 	 * "developers" that you know this function returns but you're
@@ -201,25 +209,32 @@ void init(void)
 	(void)open("/dev/tty0", O_RDWR, 0);
 	(void)dup(0);	/* duplicate fd 0 to fd 1(stdout) */
 	(void)dup(0);	/* duplicate fd 0 to fd 2(stderr) */
+
 	printf("%d buffer_head = %d bytes buffer space\n", NR_BUFFERS,
 		NR_BUFFERS * BLOCK_SIZE);
-	printf("Free mem: %d bytes\n", memory_end - memory_start);
+	printf("Total available memory: %d bytes\n", memory_end - memory_start);
 
 	if (!(pid = fork())) {
-		/* redirect stdin(fd 0) to /etc/rc */
+		/* ---- this is task2's context ---- */
+		/* 
+		 * redirect stdin(fd 0) to /etc/rc which will be used by
+		 * /bin/sh
+		 */
 		close(0);		
 		if (open("/etc/rc", O_RDONLY, 0))
 			_exit(1);
+
 		execve("/bin/sh", argv_rc, envp_rc);
 		_exit(2);
 	}
 
+	/* let task1 wait task2 die */
 	if (pid > 0) {
 		while (pid != wait(&stat))
 			/* nothing */;
 	}
 
-	/* child process pid 2 has died, re-create it */
+	/* child process pid 2(task2) has died, re-create it */
 	while (1) {
 		if ((pid = fork()) < 0) {
 			printf("Fork failed in init\n");
@@ -237,9 +252,10 @@ void init(void)
 			_exit(execve("/bin/sh", argv, envp));
 		}
 
-		while (1)
+		while (1) {
 			if (pid == wait(&stat))
 				break;
+		}
 		printf("\nchild %d died with code %04x\n", pid, stat);
 		sync();
 	}

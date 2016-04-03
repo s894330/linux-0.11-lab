@@ -40,7 +40,7 @@ static inline void oom(void)
 __asm__("movl %%eax, %%cr3"::"a" (0))
 
 /* these are not to be changed without changing head.s etc */
-#define LOW_MEM 0x100000
+#define LOW_MEM 0x100000    /* 1MB */
 #define PAGING_MEMORY (15 * 1024 * 1024)
 #define TOTAL_PAGES (PAGING_MEMORY >> 12)
 #define MAP_NR(addr) (((addr) - LOW_MEM) >> 12)
@@ -205,7 +205,10 @@ int copy_page_tables(unsigned long from, unsigned long to, long size)
 		/* set new created page property to “User, R/W, Present" */
 		*to_dir = ((unsigned long)to_page_table) | 7;
 
-		/* if we copy page tables from task 0, only copy 160 entry */
+		/* 
+		 * if we copy page tables from task 0, only copy 160 entry,
+		 * because task0 only has 640KB data size
+		*/
 		nr = (from == 0) ? 0xa0 : 1024;
 		for (; nr-- > 0; from_page_table++, to_page_table++) {
 			this_page = *from_page_table;
@@ -218,7 +221,7 @@ int copy_page_tables(unsigned long from, unsigned long to, long size)
 
 			/* 
 			 * both from_page and to_page share the same 4KB memory
-			 * page
+			 * page, but to_page mark as read only
 			 * */
 			*to_page_table = this_page;
 
@@ -273,25 +276,26 @@ unsigned long put_page(unsigned long page, unsigned long address)
 	return page;
 }
 
-void un_wp_page(unsigned long *table_entry)
+void un_wp_page(unsigned long *page_addr)
 {
 	unsigned long old_page, new_page;
 
 	/* if page is not shared (memory_map[] = 1), change property to R/W */
-	old_page = 0xfffff000 & *table_entry;
+	old_page = 0xfffff000 & *page_addr;
 	if (old_page >= LOW_MEM && memory_map[MAP_NR(old_page)] == 1) {
-		*table_entry |= 2;
+		*page_addr |= 2;
 		refresh_TLB();
 		return;
 	}
 
+	/* mamory page is shread with other process, need create new one */
 	if (!(new_page = get_free_page()))
 		oom();
 
 	if (old_page >= LOW_MEM)
 		memory_map[MAP_NR(old_page)]--;
 
-	*table_entry = new_page | 7;
+	*page_addr = new_page | 7;
 	refresh_TLB();
 	copy_page(old_page, new_page);
 }	
@@ -323,7 +327,7 @@ void do_wp_page(unsigned long error_code, unsigned long address)
 
 void write_verify(unsigned long address)
 {
-	unsigned long pgt_addr;
+	unsigned long pgt_addr;	/* page table address */
 	unsigned long page_addr;
 
 	pgt_addr = *((unsigned long *)((address >> 22) * 4));

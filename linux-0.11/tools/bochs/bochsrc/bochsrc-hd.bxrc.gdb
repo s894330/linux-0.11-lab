@@ -1,20 +1,17 @@
+gdbstub: enabled=1, port=1234, text_base=0, data_base=0, bss_base=0
 romimage: file=/usr/share/bochs/BIOS-bochs-latest
 megs: 16
 vgaromimage: file=/usr/share/vgabios/vgabios.bin
-floppya: 1_44="images/Image", status=inserted, write_protected=1
-floppyb: 1_44="rootfs/rootimage-0.11", status=inserted
+floppya: 1_44="images/Image", status=inserted
 ata0-master: type=disk, path="rootfs/hdc-0.11.img", mode=flat, cylinders=410, heads=16, spt=38
 boot: a
 log: bochsout.txt
-#vga_update_interval: 300000
-vga:update_freq=10
-#keyboard_serial_delay: 200
-#keyboard_paste_delay: 100000
-keyboard: type=mf, serial_delay=200, paste_delay=100000
+vga_update_interval: 300000
+keyboard_serial_delay: 200
+keyboard_paste_delay: 100000
 mouse: enabled=0
 private_colormap: enabled=0
 fullscreen: enabled=0
 screenmode: name="sample"
-#i440fxsupport: enabled=0
-pci: enabled=0, chipset=i440fx
+i440fxsupport: enabled=0
 display_library: sdl

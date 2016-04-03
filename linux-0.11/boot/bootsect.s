@@ -79,7 +79,7 @@ go:	mov	%cs, %ax	    # ds = es = ss = cs = 0x9000
 	# put stack at 0x9ff00. Make sure ss:sp must > 0x90200 + <setup size>
 	mov	$0xff00, %sp	    # arbitrary value >> 512
 
-# load the setup-sectors directly after the bootblock.
+# load the setup-sectors directly after the boot block.
 # Note that 'es' is already set up.
 load_setup:
 	mov	$0x0000, %dx	    # dl: drive 0, dh: head 0 (1st floppy)

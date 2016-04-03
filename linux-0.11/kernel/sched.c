@@ -43,6 +43,7 @@ void show_stat(void)
 			show_task(i,task[i]);
 }
 
+/* HZ = 100, means we want the timer interrupt every 10ms */
 #define LATCH (1193180 / HZ)
 
 extern void mem_use(void);
@@ -69,6 +70,7 @@ struct task_struct *last_task_used_math = NULL;
 
 struct task_struct *task[NR_TASKS] = {&(init_task.task),};
 
+/* 4byte * (4096 / 4) = 4KB stack size */
 long user_stack[PAGE_SIZE >> 2];
 
 struct {
@@ -147,6 +149,7 @@ void schedule(void)
 			}
 		}
 
+		/* if c = -1 => means next = 0, so we will switch to task0 */
 		if (c) 
 			break;
 
@@ -154,10 +157,11 @@ void schedule(void)
 		 * now c = 0, means every task's counter is 0, need re-allocate
 		 * all task's counter
 		 */
-		for (p = &LAST_TASK; p > &FIRST_TASK; --p)
+		for (p = &LAST_TASK; p > &FIRST_TASK; --p) {
 			if (*p)
 				(*p)->counter = ((*p)->counter >> 1) + 
-					(*p)->priority;
+				    (*p)->priority;
+		}
 	}
 
 	switch_to(next);
@@ -181,11 +185,11 @@ void sleep_on(struct task_struct **p)
 	if (current == &(init_task.task))
 		panic("task[0] trying to sleep");
 
-	tmp = *p;   /* save previous waiting process */
-	*p = current;
+	tmp = *p;   /* save previous waiting process to tmp */
+	*p = current; /* current process become head waiting process */
 	current->state = TASK_UNINTERRUPTIBLE;
 	schedule();
-	*p = tmp;   /* when waked up, restore previous waiting process */
+	*p = tmp;   /* when switch back, restore previous waiting process */
 
 	if (tmp)
 		tmp->state = TASK_RUNNING;
@@ -206,6 +210,7 @@ void interruptible_sleep_on(struct task_struct **p)
 repeat:	current->state = TASK_INTERRUPTIBLE;
 	schedule();
 
+	//TODO which situation will cause this to true?
 	if (*p && *p != current) {
 		(*p)->state = TASK_RUNNING;
 		goto repeat;
@@ -343,7 +348,7 @@ void do_timer(long cpl)
 		if (!--beepcount)
 			sysbeepstop();
 
-	if (cpl)
+	if (cpl)    /* system is at user mode before timer interrupt */
 		current->utime++;
 	else
 		current->stime++;
@@ -359,11 +364,19 @@ void do_timer(long cpl)
 			(fn)();
 		}
 	}
+
 	if (current_DOR & 0xf0)
 		do_floppy_timer();
-	if ((--current->counter)>0) return;
-	current->counter=0;
-	if (!cpl) return;
+
+	if ((--current->counter) > 0)
+		return;
+
+	/* current process has no any time slice, begin schedule */
+	current->counter = 0;
+
+	/* we forbid schedule() if previous context is at kernel space */
+	if (!cpl)
+		return;
 	schedule();
 }
 
@@ -449,12 +462,16 @@ void schedule_init(void)
 	ltr(0);
 	lldt(0);
 
-	/* init timer */
+	/* init timer chip 8253 */
 	outb_p(0x36, 0x43);	    /* binary, mode 3, LSB/MSB, ch 0 */
 	outb_p(LATCH & 0xff, 0x40); /* LSB */
 	outb(LATCH >> 8, 0x40);	    /* MSB */
-	set_intr_gate(0x20, &timer_interrupt);	/* IRQ0 */
-	outb(inb_p(0x21) & 0xfe, 0x21);    /* enable timer interrupt signal */
+
+	/* register IRQ0 ISR */
+	set_intr_gate(0x20, &timer_interrupt);
+
+	/* enable 8259A timer interrupt signal */
+	outb(inb_p(0x21) & 0xfe, 0x21);
 
 	/* register system call ISR */
 	set_system_gate(0x80, &system_call);

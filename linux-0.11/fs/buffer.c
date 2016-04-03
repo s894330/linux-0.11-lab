@@ -258,6 +258,7 @@ repeat:
 	}
 
 	wait_on_buffer(bh);
+
 	/* if bh is used by other process during wait_on_buffer(), loop again */
 	if (bh->b_count)
 		goto repeat;
@@ -278,7 +279,7 @@ repeat:
 
 	/* 
 	 * OK, FINALLY we know that this buffer is the only one of it's kind,
-	 * and that it's unused (b_count=0), unlocked (b_lock=0), and clean
+	 * and that it's unused (b_count = 0), unlocked (b_lock = 0), and clean
 	 */
 	bh->b_count = 1;
 	bh->b_dirt = 0;
@@ -295,9 +296,11 @@ void brelse(struct buffer_head *buf)
 {
 	if (!buf)
 		return;
+
 	wait_on_buffer(buf);
-	if (!(buf->b_count--))
+	if (!buf->b_count)
 		panic("Trying to free free buffer");
+	buf->b_count--;
 	wake_up(&buffer_wait);
 }
 
@@ -309,6 +312,7 @@ struct buffer_head *bread(int dev, int block)
 {
 	struct buffer_head *bh;
 
+	/* request a buffer_head first */
 	if (!(bh = getblk(dev, block)))
 		panic("bread: getblk returned NULL\n");
 
@@ -376,10 +380,11 @@ struct buffer_head *breada(int dev, int first, ...)
 	va_start(args, first);
 	if (!(bh = getblk(dev, first)))
 		panic("bread: getblk returned NULL\n");
+
 	if (!bh->b_uptodate)
 		ll_rw_block(READ, bh);
 
-	while ((first = va_arg(args, int)) >=0 ) {
+	while ((first = va_arg(args, int)) >= 0 ) {
 		tmp = getblk(dev, first);
 		if (tmp) {
 			if (!tmp->b_uptodate)
@@ -389,8 +394,8 @@ struct buffer_head *breada(int dev, int first, ...)
 			tmp->b_count--;
 		}
 	}
-
 	va_end(args);
+
 	wait_on_buffer(bh);
 	if (bh->b_uptodate)
 		return bh;

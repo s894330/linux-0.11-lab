@@ -55,9 +55,8 @@ static int permission(struct m_inode *inode, int mask)
 }
 
 /*
- * ok, we cannot use strncmp, as the name is not in our data space.
- * Thus we'll have to use match. No big problem. Match also makes
- * some sanity tests.
+ * ok, we cannot use strncmp, as the name is not in our kernel data space. Thus
+ * we'll have to use match. No big problem. Match also makes some sanity tests.
  *
  * NOTE! unlike strncmp, match returns 1 for success, 0 for failure.
  */
@@ -71,7 +70,7 @@ static int match(int len, const char *name, struct dir_entry *de)
 		return 0;
 	
 	__asm__("cld\n\t"
-		/* repeat compare using fs segment(user space) */
+		/* repeat compare data which is in user space(using fs segment) */
 		"fs; repe; cmpsb\n\t"
 		"setz %%al" /* if [edi] == [esi], set al to 1 */
 		:"=a" (same)
@@ -92,7 +91,7 @@ static int match(int len, const char *name, struct dir_entry *de)
  * over a pseudo-root and a mount point.
  */
 static struct buffer_head *find_entry(struct m_inode **dir, const char *name,
-	int namelen, struct dir_entry **res_dir)
+		int namelen, struct dir_entry **res_dir)
 {
 	int entries;
 	int block, i;
@@ -148,10 +147,11 @@ static struct buffer_head *find_entry(struct m_inode **dir, const char *name,
 	de = (struct dir_entry *)bh->b_data;
 	while (i < entries) {
 		/* check next block */
-		if ((char *)de >= BLOCK_SIZE + bh->b_data) {
+		if ((char *)de >= bh->b_data + BLOCK_SIZE) {
 			brelse(bh);
 			bh = NULL;
 
+			/* read next block */
 			if (!(block = bmap(*dir, i / DIR_ENTRIES_PER_BLOCK)) ||
 			    !(bh = bread((*dir)->i_dev, block))) {
 				i += DIR_ENTRIES_PER_BLOCK;
@@ -309,7 +309,7 @@ static struct m_inode *get_dir(const char *pathname)
  * specified name, and the name within that directory.
  */
 static struct m_inode *dir_namei(const char *pathname, int *namelen,
-	const char **name)
+		const char **name)
 {
 	char c;
 	const char *basename;
@@ -376,8 +376,8 @@ struct m_inode *namei(const char *pathname)
  *
  * namei for open - this is in fact almost the whole open-routine.
  */
-int open_namei(const char *pathname, int flag, int mode, 
-	struct m_inode **res_inode)
+int open_namei(const char *pathname, int flag, int mode,
+		struct m_inode **res_inode)
 {
 	const char *basename;
 	int inr, dev, namelen;

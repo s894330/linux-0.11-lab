@@ -57,6 +57,9 @@ begbss:
 	ljmp    $BOOTSEG, $_start   # ljmp specifies a code segment to switch to
 				    # in addition to the address to jump to.
 				    # after this line, cs = 0x07c0, ip = _start
+				    # why we should this instruction? because
+			            # cs is 0x0000 before execute this line, we
+				    # need to inital cs first
 _start:
 	# move self (boot sector(512byte)) from 0x7c00 to 0x90000
 	mov	$BOOTSEG, %ax
@@ -71,7 +74,7 @@ _start:
 	
 	# jump to new address and continue to execute
 	ljmp	$INITSEG, $go	    # cs = 0x9000, ip = go
-go:	mov	%cs, %ax	    # ds = es = ss = cs = 0x9000
+go:	mov	%cs, %ax	    # let ds = es = ss = cs = 0x9000
 	mov	%ax, %ds
 	mov	%ax, %es
 	mov	%ax, %ss
@@ -86,7 +89,7 @@ load_setup:
 	mov	$0x0002, %cx	    # cl: sector 2 (start from 1), ch: track 0
 	mov	$0x0200, %bx	    # address = 512,offset in INITSEG to load to
 	.set    AX, 0x0200 + SETUPLEN
-        mov     $AX, %ax	    # service 2 + nrs of sectors to read
+        mov     $AX, %ax	    # service 2(read sector form drive) + nrs of sectors to read
 	int	$0x13		    # read it to es:bx (0x9000:0x0200)
 	jnc	ok_load_setup	    # ok - continue (jump if no error)
 
@@ -169,7 +172,6 @@ root_defined:
 
 	# after that (everyting loaded), we jump to the setup-routine loaded
 	# directly after the bootblock:
-
 	ljmp	$SETUPSEG, $0		# cs = 0x9020, ip = 0
 
 # This routine loads the system at address 0x10000, making sure no 64kB
@@ -177,9 +179,12 @@ root_defined:
 # tracks whenever we can.
 #
 # in:	es - starting address segment (normally 0x1000)
-sreaded:.word BOOTLEN + SETUPLEN    # sectors already readed of current track
-chead:	.word 0			    # current head
-ctrack:	.word 0			    # current track
+sreaded:
+	.word BOOTLEN + SETUPLEN    # sectors already readed of current track
+chead:	
+	.word 0			    # current head
+ctrack:	
+	.word 0			    # current track
 
 read_it:
 	mov	%es, %ax	# ax = 0x1000
@@ -299,6 +304,7 @@ msg2:
 	.byte 13, 10, 13, 10
 
 	.org 508
+# address of root_dev is 0x901fc
 root_dev:
 	.word ROOT_DEV
 boot_flag:

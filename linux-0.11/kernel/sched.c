@@ -73,9 +73,10 @@ struct task_struct *task[NR_TASKS] = {&(init_task.task),};
 /* 4byte * (4096 / 4) = 4KB stack size */
 long user_stack[PAGE_SIZE >> 2];
 
+/* 48bit(32 + 16) */
 struct {
-    long *a;	/* esp */
-    short b;	/* ss */
+    long *a;	/* esp (32bit) */
+    short b;	/* ss (16bit) */
 } stack_start = {&user_stack[PAGE_SIZE >> 2], KERNEL_DATA_SEG};
 
 /*

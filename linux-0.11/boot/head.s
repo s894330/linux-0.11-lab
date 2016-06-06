@@ -11,14 +11,12 @@
  * the page directory will exist. The startup code here will be overwritten by
  * the page directory table and page table eventually.
  */
-
 KERNEL_DATA_SEG = 0x10 	# selector of kernel data seg.
 			# 0x10: 2th item of gdt, RPL: 0
-
 .global idt, gdt, pg_dir, tmp_floppy_area, startup_32
 
 .text
-pg_dir:	    # address of page dir table is at 0x0
+pg_dir:	    # address of page dir table which start at 0x0
 startup_32:
 	movl	$KERNEL_DATA_SEG, %eax	# let ds,es,fs,gs has the same segment
 	mov 	%ax, %ds
@@ -30,7 +28,7 @@ startup_32:
 	call	setup_idt
 	call 	setup_gdt
 
-	movl 	$KERNEL_DATA_SEG, %eax	# we have chang gdt, so need reload all
+	movl 	$KERNEL_DATA_SEG, %eax	# because we chang gdt, so need reload all
 	mov 	%ax, %ds		# the segment registers. CS was already
 	mov 	%ax, %es		# reloaded during 'setup_gdt'
 	mov 	%ax, %fs
@@ -51,10 +49,19 @@ startup_32:
  * 486 users probably also want to set the NE (#5) bit also, so as to use
  * int 16 for math errors.
  */
+/* 
+ * (bit0) PE: Protected Mode Enable
+ * (bit1) MP: Monitor co-processor
+ * (bit2) EM: Emulation - If set, no x87 floating point unit present, if clear,
+ *			  x87 FPU present
+ * (bit4) ET: Extension type - On the 386, it allowed to specify whether the
+ *			       external math coprocessor was an 80287 or 80387
+ * (bit31)PG: Paging
+ */
 	movl 	%cr0, %eax		# check math chip
-	andl 	$0x80000011, %eax	# Save PG,PE,ET
+	andl 	$0x80000011, %eax	# Save PG, ET, PE
 	/* "orl $0x10020,%eax" here for 486 might be good */
-	orl 	$2, %eax		# set MP to assume we have x87 co-processor
+	orl 	$2, %eax		# enable MP to assume we have x87 co-processor
 	movl 	%eax, %cr0
 	call 	check_x87
 	jmp 	after_page_tables
@@ -66,14 +73,14 @@ check_x87:
 	fninit			/* fninit and fstsw are instruction of 287/387 */
 	fstsw 	%ax		/* if has 287/387, al should be zero after */
 	cmpb 	$0, %al		/* execute fstsw instruction */
-	je 1f			/* currently we have FPU(387) on QEMU emulator */
+	je 1f			/* currently we have FPU(387) on QEMU/Bochs emulator */
 	
 	/* 
 	 * no coprocessor: have to set EM bits. On QEMU, following will not
 	 * be executed
 	 */
 	movl 	%cr0, %eax
-	xorl 	$6, %eax	/* reset MP, set EM */
+	xorl 	$6, %eax	/* disable MP, enable EM */
 	movl 	%eax, %cr0
 	ret
 
@@ -84,16 +91,20 @@ check_x87:
 /*
  *  setup_idt
  *
- *  sets up a idt with 256 entries pointing to ignore_int, interrupt gates.
+ *  sets up idt with 256 entries pointing to ignore_int, interrupt gates.
  *  It then loads idt. Everything that wants to install itself in the idt-table
  *  may do so themselves. Interrupts are enabled at other place, when we can be
  *  relatively sure everything is ok. This routine will be over-written by the
  *  page tables.
+ *
+ *  format of idt descriptor (totally 64bit(8byte)):
+ *  <31~16> address of isr + <idt property (15~0)>
+ *  <selector (31~16)>     + <15~0> address of isr
  */
 setup_idt:
 	lea 	ignore_int, %edx	# lea: load effective address
 	movl 	$0x00080000, %eax
-	movw 	%dx, %ax		/* selector = 0x0008 */
+	movw 	%dx, %ax		/* selector = 0x0008(kernel code seg.) */
 	movw 	$0x8e00, %dx		/* 0x8e00: inter gate, DPL 0, present */
 
 	lea 	idt, %edi
@@ -105,7 +116,7 @@ rp_sidt:
 	dec 	%ecx
 	jne 	rp_sidt
 
-	lidt 	idt_descr
+	lidt 	idt_descr   # after done setup idt table, load it
 	ret
 
 /*
@@ -178,7 +189,7 @@ ignore_int:
 	mov 	%ax, %ds
 	mov 	%ax, %es
 	mov 	%ax, %fs
-	pushl 	$int_msg	# int_msg is param of print();
+	pushl 	$int_msg	# int_msg is param of printk();
 	call 	printk		# printk() is implemented in C code
 	popl 	%eax
 
@@ -212,13 +223,15 @@ ignore_int:
  */
 .align 4
 setup_paging:
+	/* clean 20KB (1 pg_dir + 4 pg table) */
 	movl 	$1024 * 5, %ecx		/* 5 pages - pg_dir + 4 page tables */
 	xorl 	%eax, %eax
 	xorl 	%edi, %edi		/* pg_dir is at 0x0 */
 	cld
 	rep
 		stosl			/* clean 5 pages */
-/* 
+					/* stosl: store value of eax to es:edi, than edi add 4 byte */
+/*
  * Format of page dir entry and page table entry:
  * 31 ............ 12 11~9 8 7 6 5 4 3 2 1 0
  *  page frame addr    AVL 0 0 D A 0 0 U R P
@@ -243,7 +256,10 @@ setup_paging:
 	movl 	$pg3 + 7, pg_dir + 12	/*  --------- " " --------- */
 
 	/* ---- setup 4 page table ---- */
-	/* begins from last page table entry of last page table */
+	/* 
+	 * begins from last page table entry of last page table, which point to
+	 * last 4KB memory address (0xfff0000)
+	 */
 	movl 	$pg3 + 4092, %edi	/* edi = address of last page entry */
 	movl 	$0xfff007, %eax		/* 16MB - 4096 + 7 (r/w user,p)=>last */
 	std
@@ -253,7 +269,7 @@ setup_paging:
 	cld				/* setup done, reset direction flag */
 
 	/* load address of page directory table into CR3 */
-	xorl 	%eax, %eax		/* pg_dir is at 0x0000 */
+	xorl 	%eax, %eax		/* because pg_dir is at 0x0000 */
 	movl 	%eax, %cr3		/* load addr of pg_dir into CR3 */
 					/* movl to CR3 will refresh TLB */
 

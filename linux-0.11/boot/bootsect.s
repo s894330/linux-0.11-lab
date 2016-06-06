@@ -308,7 +308,10 @@ msg2:
 root_dev:
 	.word ROOT_DEV
 boot_flag:
-	.word 0xaa55
+#	.word 0xaa55
+	# below is the same meaning as above 0xaa55
+	.byte 0x55
+	.byte 0xaa
 	
 	.text
 	endtext:

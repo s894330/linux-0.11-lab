@@ -11,3 +11,4 @@ cscope.*
 .vimSession
 ctag.files
 bochsout.txt
+bx_enh_dbg.ini

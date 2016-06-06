@@ -27,7 +27,7 @@ begdata:
 begbss:
 
 .text
-	ljmp $SETUPSEG, $_start	# cs = 0x9020
+	ljmp	$SETUPSEG, $_start	# let cs = 0x9020
 _start:
 	# ok, the read went well so we get current cursor position and save it
 	# for future use
@@ -115,7 +115,7 @@ has_disk1:
 				# we set it up, interrupt should be ignore to
 				# prevent system crash
 
-	# first we move the system to it's rightful place
+	# first we move the system to it's rightful place: 0x0
 	mov	$0x0000, %ax
 	cld			# 'direction'=0, "mov" will  moves forward
 

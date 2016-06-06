@@ -3,6 +3,7 @@
 
 #define __GNU_EXEC_MACROS__
 
+/* 32 byte */
 struct exec {
   unsigned long a_magic;	/* Use macros N_MAGIC, etc for access */
   unsigned int a_text;		/* length of text, in bytes */
@@ -109,6 +110,7 @@ struct exec {
 #endif
 
 #ifndef N_NLIST_DECLARED
+/* 12 byte */
 struct nlist {
   union {
     char *n_name;
